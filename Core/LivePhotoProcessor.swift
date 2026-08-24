@@ -32,12 +32,13 @@ enum LivePhotoProcessor {
         return copy
     }
 
-    static func applyWatermark(to asset: PHAsset, progress: @escaping @Sendable (Double) -> Void) async throws {
-        let input = try await asset.contentEditingInput()
+    static func applyWatermark(to asset: PHAsset, metadata: WatermarkMetadata,
+                               progress: @escaping @Sendable (Double) -> Void) async throws {
+        let (readyAsset, input) = try await readyInput(for: asset.localIdentifier)
         guard let context = PHLivePhotoEditingContext(livePhotoEditingInput: input) else {
             throw WatermarkError.notLivePhoto
         }
-        let renderer = GlassRenderer(metadata: MetadataReader.read(asset: asset, input: input))
+        let renderer = GlassRenderer(metadata: metadata)
         context.frameProcessor = { frame, error in
             guard error?.pointee == nil else { return nil }
             let duration = input.audiovisualAsset?.duration.seconds ?? 1
@@ -45,6 +46,11 @@ enum LivePhotoProcessor {
             return renderer.render(frame.image)
         }
         let output = PHContentEditingOutput(contentEditingInput: input)
+        output.adjustmentData = PHAdjustmentData(
+            formatIdentifier: "com.localwatermark.liquidglass",
+            formatVersion: "1.0",
+            data: Data("{\"effect\":\"liquid-glass\",\"version\":1}".utf8)
+        )
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             context.saveLivePhoto(to: output, options: nil) { success, error in
                 if success { continuation.resume() }
@@ -52,8 +58,29 @@ enum LivePhotoProcessor {
             }
         }
         try await PHPhotoLibrary.shared().performChanges {
-            PHAssetChangeRequest(for: asset).contentEditingOutput = output
+            PHAssetChangeRequest(for: readyAsset).contentEditingOutput = output
         }
+    }
+
+    private static func readyInput(for identifier: String) async throws -> (PHAsset, PHContentEditingInput) {
+        var lastError: Error = WatermarkError.assetUnavailable
+        for attempt in 0..<12 {
+            if attempt > 0 {
+                try await Task.sleep(nanoseconds: 700_000_000)
+            }
+            guard let refreshed = PHAsset.fetchAssets(
+                withLocalIdentifiers: [identifier], options: nil
+            ).firstObject else { continue }
+            do {
+                let input = try await refreshed.contentEditingInput()
+                if input.livePhoto != nil, input.audiovisualAsset != nil {
+                    return (refreshed, input)
+                }
+            } catch {
+                lastError = error
+            }
+        }
+        throw lastError
     }
 
     private static func write(_ resource: PHAssetResource, to url: URL) async throws {
