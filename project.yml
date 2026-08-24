@@ -17,14 +17,15 @@ targets:
       - App
       - Core
       - Intents
+    resources:
+      - Resources/Assets.xcassets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.localwatermark.liquidglass
         PRODUCT_NAME: LiquidGlassWatermark
         INFOPLIST_FILE: Resources/Info.plist
-        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MACCATALYST: NO
     scheme:
       gatherCoverageData: false
-
