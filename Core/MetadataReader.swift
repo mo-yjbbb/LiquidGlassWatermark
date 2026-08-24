@@ -40,7 +40,7 @@ enum MetadataReader {
             }
             if let iso = (exif[kCGImagePropertyExifISOSpeedRatings] as? [NSNumber])?.first {
                 parts.append("ISO\(iso.intValue)")
-            } else if let iso = exif["PhotographicSensitivity"] as? NSNumber {
+            } else if let iso = exif["PhotographicSensitivity" as CFString] as? NSNumber {
                 parts.append("ISO\(iso.intValue)")
             }
             if !parts.isEmpty { value.exposure = parts.joined(separator: "  ") }
