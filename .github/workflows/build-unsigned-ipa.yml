@@ -30,9 +30,11 @@ jobs:
         run: |
           mkdir -p Payload
           cp -R "build/Build/Products/Release-iphoneos/LiquidGlassWatermark.app" Payload/
-          ditto -c -k --sequesterRsrc --keepParent Payload LiquidGlassWatermark-unsigned.ipa
+          codesign --force --deep --sign - Payload/LiquidGlassWatermark.app
+          codesign --verify --deep --strict Payload/LiquidGlassWatermark.app
+          ditto -c -k --sequesterRsrc --keepParent Payload LiquidGlassWatermark-adhoc.ipa
       - uses: actions/upload-artifact@v4
         with:
-          name: LiquidGlassWatermark-unsigned
-          path: LiquidGlassWatermark-unsigned.ipa
+          name: LiquidGlassWatermark-adhoc
+          path: LiquidGlassWatermark-adhoc.ipa
 
