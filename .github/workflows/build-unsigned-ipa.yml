@@ -26,15 +26,42 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             clean build
-      - name: Package IPA
+      - name: Package signer-compatible IPAs
         run: |
-          mkdir -p Payload
-          cp -R "build/Build/Products/Release-iphoneos/LiquidGlassWatermark.app" Payload/
-          codesign --force --deep --sign - Payload/LiquidGlassWatermark.app
-          codesign --verify --deep --strict Payload/LiquidGlassWatermark.app
-          ditto -c -k --sequesterRsrc --keepParent Payload LiquidGlassWatermark-adhoc.ipa
+          set -euo pipefail
+          APP="build/Build/Products/Release-iphoneos/LiquidGlassWatermark.app"
+          test -f "$APP/LiquidGlassWatermark"
+          /usr/bin/file "$APP/LiquidGlassWatermark" | grep -q "Mach-O 64-bit executable arm64"
+          rm -rf package-clean package-adhoc verify
+          mkdir -p package-clean/Payload package-adhoc/Payload verify
+          cp -R "$APP" package-clean/Payload/
+          cp -R "$APP" package-adhoc/Payload/
+
+          xattr -cr package-clean/Payload/LiquidGlassWatermark.app || true
+          rm -rf package-clean/Payload/LiquidGlassWatermark.app/_CodeSignature
+          rm -f package-clean/Payload/LiquidGlassWatermark.app/embedded.mobileprovision
+
+          xattr -cr package-adhoc/Payload/LiquidGlassWatermark.app || true
+          rm -rf package-adhoc/Payload/LiquidGlassWatermark.app/_CodeSignature
+          rm -f package-adhoc/Payload/LiquidGlassWatermark.app/embedded.mobileprovision
+          codesign --force --sign - package-adhoc/Payload/LiquidGlassWatermark.app
+          codesign --verify --strict package-adhoc/Payload/LiquidGlassWatermark.app
+
+          (cd package-clean && /usr/bin/zip -qry -X ../LiquidGlassWatermark-clean.ipa Payload)
+          (cd package-adhoc && /usr/bin/zip -qry -X ../LiquidGlassWatermark-adhoc.ipa Payload)
+
+          for IPA in LiquidGlassWatermark-clean.ipa LiquidGlassWatermark-adhoc.ipa; do
+            unzip -q "$IPA" -d "verify/${IPA%.ipa}"
+            test -f "verify/${IPA%.ipa}/Payload/LiquidGlassWatermark.app/LiquidGlassWatermark"
+            if unzip -Z1 "$IPA" | grep -Eq '(^__MACOSX/|\.DS_Store$|/\._)'; then
+              echo "Unexpected macOS metadata in $IPA" >&2
+              exit 1
+            fi
+          done
       - uses: actions/upload-artifact@v4
         with:
-          name: LiquidGlassWatermark-adhoc
-          path: LiquidGlassWatermark-adhoc.ipa
+          name: LiquidGlassWatermark-signer-compatible
+          path: |
+            LiquidGlassWatermark-clean.ipa
+            LiquidGlassWatermark-adhoc.ipa
 
