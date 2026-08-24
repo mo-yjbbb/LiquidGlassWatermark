@@ -1,0 +1,30 @@
+name: LiquidGlassWatermark
+options:
+  bundleIdPrefix: com.localwatermark
+  deploymentTarget:
+    iOS: "26.0"
+settings:
+  base:
+    SWIFT_VERSION: 6.0
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGNING_ALLOWED: NO
+    CODE_SIGNING_REQUIRED: NO
+targets:
+  LiquidGlassWatermark:
+    type: application
+    platform: iOS
+    sources:
+      - App
+      - Core
+      - Intents
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.localwatermark.liquidglass
+        PRODUCT_NAME: 液态玻璃水印
+        INFOPLIST_FILE: Resources/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: NO
+    scheme:
+      gatherCoverageData: false
+
