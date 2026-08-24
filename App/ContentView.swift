@@ -1,6 +1,7 @@
 import SwiftUI
 import Photos
 import PhotosUI
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @StateObject private var model = WatermarkModel()
@@ -51,10 +52,10 @@ struct ContentView: View {
             .padding()
             .navigationTitle("本地处理")
             .sheet(isPresented: $showingPicker) {
-                AssetPicker { identifier in
+                AssetPicker { selection in
                     showingPicker = false
-                    guard let identifier else { return }
-                    Task { await model.process(localIdentifier: identifier) }
+                    guard let selection else { return }
+                    Task { await model.process(selection: selection) }
                 }
             }
         }
@@ -62,7 +63,7 @@ struct ContentView: View {
 }
 
 private struct AssetPicker: UIViewControllerRepresentable {
-    let completion: (String?) -> Void
+    let completion: (PickedPhoto?) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(completion: completion) }
 
@@ -79,11 +80,55 @@ private struct AssetPicker: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: PHPickerViewController, context: Context) {}
 
     final class Coordinator: NSObject, PHPickerViewControllerDelegate {
-        let completion: (String?) -> Void
-        init(completion: @escaping (String?) -> Void) { self.completion = completion }
+        let completion: (PickedPhoto?) -> Void
+        init(completion: @escaping (PickedPhoto?) -> Void) { self.completion = completion }
 
         func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
-            completion(results.first?.assetIdentifier)
+            guard let result = results.first else {
+                completion(nil)
+                return
+            }
+            let provider = result.itemProvider
+            let isLive = provider.hasItemConformingToTypeIdentifier(UTType.livePhoto.identifier)
+            provider.loadFileRepresentation(forTypeIdentifier: UTType.image.identifier) { [weak self] url, _ in
+                guard let self else { return }
+                guard let url else {
+                    self.loadImageData(provider: provider, result: result, isLive: isLive)
+                    return
+                }
+                let ext = url.pathExtension.isEmpty ? "heic" : url.pathExtension
+                let copy = FileManager.default.temporaryDirectory
+                    .appendingPathComponent(UUID().uuidString)
+                    .appendingPathExtension(ext)
+                do {
+                    try FileManager.default.copyItem(at: url, to: copy)
+                    let selection = PickedPhoto(localIdentifier: result.assetIdentifier,
+                                                imageURL: copy, isLivePhoto: isLive)
+                    DispatchQueue.main.async { self.completion(selection) }
+                } catch {
+                    self.loadImageData(provider: provider, result: result, isLive: isLive)
+                }
+            }
+        }
+
+        private func loadImageData(provider: NSItemProvider, result: PHPickerResult, isLive: Bool) {
+            provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { [completion] data, _ in
+                guard let data, !data.isEmpty else {
+                    DispatchQueue.main.async { completion(nil) }
+                    return
+                }
+                let copy = FileManager.default.temporaryDirectory
+                    .appendingPathComponent(UUID().uuidString)
+                    .appendingPathExtension("img")
+                do {
+                    try data.write(to: copy, options: .atomic)
+                    let selection = PickedPhoto(localIdentifier: result.assetIdentifier,
+                                                imageURL: copy, isLivePhoto: isLive)
+                    DispatchQueue.main.async { completion(selection) }
+                } catch {
+                    DispatchQueue.main.async { completion(nil) }
+                }
+            }
         }
     }
 }

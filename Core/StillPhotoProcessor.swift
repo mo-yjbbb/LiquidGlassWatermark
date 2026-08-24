@@ -3,10 +3,8 @@ import CoreImage
 import UIKit
 
 enum StillPhotoProcessor {
-    static func process(asset: PHAsset, metadata: WatermarkMetadata) async throws {
-        let url = try await PhotoResourceLoader.imageURL(for: asset)
-        defer { try? FileManager.default.removeItem(at: url) }
-        guard let ciImage = CIImage(contentsOf: url, options: [.applyOrientationProperty: true]) else {
+    static func process(imageURL: URL, asset: PHAsset?, metadata: WatermarkMetadata) async throws {
+        guard let ciImage = CIImage(contentsOf: imageURL, options: [.applyOrientationProperty: true]) else {
             throw WatermarkError.assetUnavailable
         }
         let renderer = GlassRenderer(metadata: metadata)
@@ -16,8 +14,8 @@ enum StillPhotoProcessor {
         try await PHPhotoLibrary.shared().performChanges {
             let request = PHAssetCreationRequest.forAsset()
             request.addResource(with: .photo, data: data, options: nil)
-            request.creationDate = asset.creationDate
-            request.location = asset.location
+            request.creationDate = asset?.creationDate
+            request.location = asset?.location
         }
     }
 }

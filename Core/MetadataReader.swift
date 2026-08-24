@@ -2,14 +2,14 @@ import Photos
 import ImageIO
 
 enum MetadataReader {
-    static func read(asset: PHAsset, imageURL: URL) -> WatermarkMetadata {
+    static func read(asset: PHAsset?, imageURL: URL) -> WatermarkMetadata {
         var value = WatermarkMetadata()
-        if let date = asset.creationDate {
+        if let date = asset?.creationDate {
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy.MM.dd HH:mm:ss"
             value.date = formatter.string(from: date)
         }
-        if let location = asset.location {
+        if let location = asset?.location {
             value.location = coordinate(location.coordinate.latitude, positive: "N", negative: "S")
                 + "  "
                 + coordinate(location.coordinate.longitude, positive: "E", negative: "W")
@@ -17,6 +17,29 @@ enum MetadataReader {
         guard let source = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else {
             return value
+        }
+        if value.date.isEmpty,
+           let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any],
+           let text = exif[kCGImagePropertyExifDateTimeOriginal] as? String {
+            let input = DateFormatter()
+            input.locale = Locale(identifier: "en_US_POSIX")
+            input.dateFormat = "yyyy:MM:dd HH:mm:ss"
+            if let date = input.date(from: text) {
+                let output = DateFormatter()
+                output.dateFormat = "yyyy.MM.dd HH:mm:ss"
+                value.date = output.string(from: date)
+            }
+        }
+        if value.location.isEmpty,
+           let gps = properties[kCGImagePropertyGPSDictionary] as? [CFString: Any],
+           let latitude = gps[kCGImagePropertyGPSLatitude] as? NSNumber,
+           let longitude = gps[kCGImagePropertyGPSLongitude] as? NSNumber {
+            let latRef = (gps[kCGImagePropertyGPSLatitudeRef] as? String) ?? "N"
+            let lonRef = (gps[kCGImagePropertyGPSLongitudeRef] as? String) ?? "E"
+            let lat = latitude.doubleValue * (latRef.uppercased() == "S" ? -1 : 1)
+            let lon = longitude.doubleValue * (lonRef.uppercased() == "W" ? -1 : 1)
+            value.location = coordinate(lat, positive: "N", negative: "S")
+                + "  " + coordinate(lon, positive: "E", negative: "W")
         }
         if let tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any] {
             let make = (tiff[kCGImagePropertyTIFFMake] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)

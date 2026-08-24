@@ -18,8 +18,14 @@ enum LivePhotoProcessor {
         var identifier: String?
         try await PHPhotoLibrary.shared().performChanges {
             let request = PHAssetCreationRequest.forAsset()
-            request.addResource(with: .photo, fileURL: photoURL, options: nil)
-            request.addResource(with: .pairedVideo, fileURL: videoURL, options: nil)
+            let photoOptions = PHAssetResourceCreationOptions()
+            photoOptions.originalFilename = photo.originalFilename
+            photoOptions.shouldMoveFile = false
+            let videoOptions = PHAssetResourceCreationOptions()
+            videoOptions.originalFilename = video.originalFilename
+            videoOptions.shouldMoveFile = false
+            request.addResource(with: .photo, fileURL: photoURL, options: photoOptions)
+            request.addResource(with: .pairedVideo, fileURL: videoURL, options: videoOptions)
             request.creationDate = asset.creationDate
             request.location = asset.location
             identifier = request.placeholderForCreatedAsset?.localIdentifier
@@ -53,9 +59,14 @@ enum LivePhotoProcessor {
             throw WatermarkError.notLivePhoto
         }
         let renderer = GlassRenderer(metadata: metadata)
+        let duration: Double
+        if let audiovisualAsset = input.audiovisualAsset {
+            duration = (try? await audiovisualAsset.load(.duration))?.seconds ?? 1
+        } else {
+            duration = 1
+        }
         context.frameProcessor = { frame, error in
             guard error?.pointee == nil else { return nil }
-            let duration = input.audiovisualAsset?.duration.seconds ?? 1
             if duration > 0 { progress(min(max(frame.time.seconds / duration, 0), 1)) }
             return renderer.render(frame.image)
         }
@@ -86,6 +97,7 @@ enum LivePhotoProcessor {
                 withLocalIdentifiers: [identifier], options: nil
             ).firstObject else { continue }
             do {
+                try await warmLivePhoto(refreshed)
                 let input = try await refreshed.contentEditingInput()
                 if input.livePhoto != nil, input.audiovisualAsset != nil {
                     return (refreshed, input)
@@ -95,6 +107,29 @@ enum LivePhotoProcessor {
             }
         }
         throw lastError
+    }
+
+    private static func warmLivePhoto(_ asset: PHAsset) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            let options = PHLivePhotoRequestOptions()
+            options.isNetworkAccessAllowed = true
+            options.deliveryMode = .highQualityFormat
+            PHImageManager.default().requestLivePhoto(
+                for: asset,
+                targetSize: CGSize(width: 720, height: 720),
+                contentMode: .aspectFit,
+                options: options
+            ) { livePhoto, info in
+                if (info?[PHImageResultIsDegradedKey] as? Bool) == true { return }
+                if let error = info?[PHImageErrorKey] as? Error {
+                    continuation.resume(throwing: error)
+                } else if livePhoto != nil {
+                    continuation.resume()
+                } else {
+                    continuation.resume(throwing: WatermarkError.assetUnavailable)
+                }
+            }
+        }
     }
 }
 

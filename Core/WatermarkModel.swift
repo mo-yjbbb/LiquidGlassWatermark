@@ -9,28 +9,29 @@ final class WatermarkModel: ObservableObject {
     @Published var resultMessage: String?
     @Published var didSucceed = false
 
-    func process(localIdentifier: String) async {
+    func process(selection: PickedPhoto) async {
         isWorking = true
         progress = 0.05
         status = "读取照片"
         resultMessage = nil
         didSucceed = false
+        defer { try? FileManager.default.removeItem(at: selection.imageURL) }
 
         do {
-            let authorized = await PhotoAccess.request()
+            let authorized = await PhotoAccess.request(readWrite: selection.isLivePhoto)
             guard authorized else { throw WatermarkError.photoPermissionDenied }
-            let result = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil)
-            guard let asset = result.firstObject else { throw WatermarkError.assetUnavailable }
+            let asset = selection.localIdentifier.flatMap {
+                PHAsset.fetchAssets(withLocalIdentifiers: [$0], options: nil).firstObject
+            }
             status = "读取真实拍摄参数"
-            let sourceURL = try await PhotoResourceLoader.imageURL(for: asset)
-            let metadata = MetadataReader.read(asset: asset, imageURL: sourceURL)
-            try? FileManager.default.removeItem(at: sourceURL)
+            let metadata = MetadataReader.read(asset: asset, imageURL: selection.imageURL)
             guard !metadata.device.isEmpty, !metadata.exposure.isEmpty,
                   !metadata.date.isEmpty, !metadata.location.isEmpty else {
                 throw WatermarkError.metadataUnavailable
             }
 
-            if asset.mediaSubtypes.contains(.photoLive) {
+            if selection.isLivePhoto {
+                guard let asset else { throw WatermarkError.livePhotoLibraryAccessRequired }
                 status = "复制 Live Photo"
                 progress = 0.15
                 let copy = try await LivePhotoProcessor.duplicate(asset: asset)
@@ -43,7 +44,8 @@ final class WatermarkModel: ObservableObject {
             } else {
                 status = "渲染照片"
                 progress = 0.4
-                try await StillPhotoProcessor.process(asset: asset, metadata: metadata)
+                try await StillPhotoProcessor.process(imageURL: selection.imageURL,
+                                                      asset: asset, metadata: metadata)
                 resultMessage = "已保存新的带水印照片"
             }
             progress = 1
@@ -58,25 +60,27 @@ final class WatermarkModel: ObservableObject {
 
 enum WatermarkError: LocalizedError {
     case photoPermissionDenied, assetUnavailable, notLivePhoto, missingResource, renderFailed, metadataUnavailable
-    case photoReadFailed(String)
+    case photoReadFailed(String), livePhotoLibraryAccessRequired
 
     var errorDescription: String? {
         switch self {
         case .photoPermissionDenied: "请在“设置 → App → 液态玻璃水印 → 照片”中选择“完全访问”"
-        case .assetUnavailable: "无法读取所选照片，请确认它已从 iCloud 下载"
+        case .assetUnavailable: "照片资源暂时不可用"
         case .notLivePhoto: "所选项目不是 Live Photo"
         case .missingResource: "Live Photo 的图片或视频资源不完整"
         case .renderFailed: "渲染或保存失败"
         case .metadataUnavailable: "照片缺少机型、时间、摄像参数或位置，无法生成完整参数水印"
         case .photoReadFailed(let detail): "读取原图失败：\(detail)"
+        case .livePhotoLibraryAccessRequired: "无法访问所选 Live Photo 的视频资源，请授予照片完全访问权限"
         }
     }
 }
 
 enum PhotoAccess {
-    static func request() async -> Bool {
-        let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
-        return status == .authorized
+    static func request(readWrite: Bool) async -> Bool {
+        let level: PHAccessLevel = readWrite ? .readWrite : .addOnly
+        let status = await PHPhotoLibrary.requestAuthorization(for: level)
+        return readWrite ? status == .authorized : (status == .authorized || status == .limited)
     }
 }
 

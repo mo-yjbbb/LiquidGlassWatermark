@@ -29,4 +29,16 @@ targets:
         SUPPORTS_MACCATALYST: NO
     scheme:
       gatherCoverageData: false
+      testTargets:
+        - LiquidGlassWatermarkTests
+  LiquidGlassWatermarkTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests
+    dependencies:
+      - target: LiquidGlassWatermark
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
 

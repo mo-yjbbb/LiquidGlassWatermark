@@ -1,6 +1,12 @@
 import Photos
 import UniformTypeIdentifiers
 
+struct PickedPhoto: Sendable {
+    let localIdentifier: String?
+    let imageURL: URL
+    let isLivePhoto: Bool
+}
+
 enum PhotoResourceLoader {
     static func imageURL(for asset: PHAsset) async throws -> URL {
         let (data, typeIdentifier) = try await imageData(for: asset)
