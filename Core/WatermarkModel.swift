@@ -25,7 +25,8 @@ final class WatermarkModel: ObservableObject {
             let sourceURL = try await PhotoResourceLoader.imageURL(for: asset)
             let metadata = MetadataReader.read(asset: asset, imageURL: sourceURL)
             try? FileManager.default.removeItem(at: sourceURL)
-            guard !metadata.device.isEmpty, !metadata.exposure.isEmpty, !metadata.date.isEmpty else {
+            guard !metadata.device.isEmpty, !metadata.exposure.isEmpty,
+                  !metadata.date.isEmpty, !metadata.location.isEmpty else {
                 throw WatermarkError.metadataUnavailable
             }
 
@@ -66,7 +67,7 @@ enum WatermarkError: LocalizedError {
         case .notLivePhoto: "所选项目不是 Live Photo"
         case .missingResource: "Live Photo 的图片或视频资源不完整"
         case .renderFailed: "渲染或保存失败"
-        case .metadataUnavailable: "未读取到完整的设备与曝光参数，已停止处理；截图、社交平台转存图或被清除 EXIF 的照片不能添加参数水印"
+        case .metadataUnavailable: "照片缺少机型、时间、摄像参数或位置，无法生成完整参数水印"
         case .photoReadFailed(let detail): "读取原图失败：\(detail)"
         }
     }

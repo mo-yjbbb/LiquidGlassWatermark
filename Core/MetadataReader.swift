@@ -10,7 +10,9 @@ enum MetadataReader {
             value.date = formatter.string(from: date)
         }
         if let location = asset.location {
-            value.location = String(format: "%.5f°, %.5f°", location.coordinate.latitude, location.coordinate.longitude)
+            value.location = coordinate(location.coordinate.latitude, positive: "N", negative: "S")
+                + "  "
+                + coordinate(location.coordinate.longitude, positive: "E", negative: "W")
         }
         guard let source = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else {
@@ -45,6 +47,25 @@ enum MetadataReader {
             if !parts.isEmpty { value.exposure = parts.joined(separator: "  ") }
         }
         return value
+    }
+
+    private static func coordinate(_ value: Double, positive: String, negative: String) -> String {
+        let absolute = abs(value)
+        let degrees = Int(absolute)
+        let minutesValue = (absolute - Double(degrees)) * 60
+        let minutes = Int(minutesValue)
+        var seconds = Int(((minutesValue - Double(minutes)) * 60).rounded())
+        var adjustedMinutes = minutes
+        var adjustedDegrees = degrees
+        if seconds == 60 {
+            seconds = 0
+            adjustedMinutes += 1
+        }
+        if adjustedMinutes == 60 {
+            adjustedMinutes = 0
+            adjustedDegrees += 1
+        }
+        return "\(adjustedDegrees)°\(adjustedMinutes)'\(seconds)\"\(value >= 0 ? positive : negative)"
     }
 }
 
