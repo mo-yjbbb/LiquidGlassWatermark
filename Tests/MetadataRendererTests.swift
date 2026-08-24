@@ -67,9 +67,9 @@ final class MetadataRendererTests: XCTestCase {
         for y in stride(from: 40, to: height, by: 72) {
             context.setStrokeColor(red: 1, green: 1, blue: 1, alpha: 0.32)
             context.move(to: CGPoint(x: 0, y: y))
-            context.addCurve(to: CGPoint(x: width, y: y + 20),
-                             control1: CGPoint(x: width * 0.3, y: y + 36),
-                             control2: CGPoint(x: width * 0.7, y: y - 20))
+            context.addCurve(to: CGPoint(x: CGFloat(width), y: CGFloat(y + 20)),
+                             control1: CGPoint(x: CGFloat(width) * 0.3, y: CGFloat(y + 36)),
+                             control2: CGPoint(x: CGFloat(width) * 0.7, y: CGFloat(y - 20)))
             context.strokePath()
         }
         let image = context.makeImage()!
