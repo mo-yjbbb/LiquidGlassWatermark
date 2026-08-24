@@ -57,6 +57,7 @@ final class WatermarkModel: ObservableObject {
 
 enum WatermarkError: LocalizedError {
     case photoPermissionDenied, assetUnavailable, notLivePhoto, missingResource, renderFailed, metadataUnavailable
+    case photoReadFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -66,6 +67,7 @@ enum WatermarkError: LocalizedError {
         case .missingResource: "Live Photo 的图片或视频资源不完整"
         case .renderFailed: "渲染或保存失败"
         case .metadataUnavailable: "未读取到完整的设备与曝光参数，已停止处理；截图、社交平台转存图或被清除 EXIF 的照片不能添加参数水印"
+        case .photoReadFailed(let detail): "读取原图失败：\(detail)"
         }
     }
 }

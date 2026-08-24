@@ -1,13 +1,37 @@
 import Photos
+import UniformTypeIdentifiers
 
 enum PhotoResourceLoader {
     static func imageURL(for asset: PHAsset) async throws -> URL {
-        let resources = PHAssetResource.assetResources(for: asset)
-        guard let resource = resources.first(where: { $0.type == .fullSizePhoto })
-                ?? resources.first(where: { $0.type == .photo }) else {
-            throw WatermarkError.missingResource
+        let (data, typeIdentifier) = try await imageData(for: asset)
+        let ext = typeIdentifier.flatMap { UTType($0)?.preferredFilenameExtension } ?? "heic"
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension(ext)
+        try data.write(to: url, options: .atomic)
+        return url
+    }
+
+    private static func imageData(for asset: PHAsset) async throws -> (Data, String?) {
+        try await withCheckedThrowingContinuation { continuation in
+            let options = PHImageRequestOptions()
+            options.isNetworkAccessAllowed = true
+            options.deliveryMode = .highQualityFormat
+            options.resizeMode = .none
+            options.version = .original
+            PHImageManager.default().requestImageDataAndOrientation(for: asset, options: options) {
+                data, typeIdentifier, _, info in
+                if let error = info?[PHImageErrorKey] as? Error {
+                    continuation.resume(throwing: WatermarkError.photoReadFailed(error.localizedDescription))
+                } else if (info?[PHImageCancelledKey] as? Bool) == true {
+                    continuation.resume(throwing: WatermarkError.photoReadFailed("系统取消了原图读取"))
+                } else if let data, !data.isEmpty {
+                    continuation.resume(returning: (data, typeIdentifier))
+                } else {
+                    continuation.resume(throwing: WatermarkError.photoReadFailed("照片图库未返回原图数据"))
+                }
+            }
         }
-        return try await localURL(for: resource)
     }
 
     static func localURL(for resource: PHAssetResource) async throws -> URL {
