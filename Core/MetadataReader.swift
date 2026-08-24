@@ -17,19 +17,32 @@ enum MetadataReader {
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else {
             return value
         }
-        if let tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any],
-           let model = tiff[kCGImagePropertyTIFFModel] as? String {
-            value.device = model
+        if let tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any] {
+            let make = (tiff[kCGImagePropertyTIFFMake] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let model = (tiff[kCGImagePropertyTIFFModel] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let model, !model.isEmpty {
+                value.device = [make, model].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
+            }
         }
         if let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any] {
             var parts: [String] = []
-            if let focal = exif[kCGImagePropertyExifFocalLength] as? NSNumber { parts.append("\(focal.intValue)mm") }
-            if let aperture = exif[kCGImagePropertyExifFNumber] as? NSNumber { parts.append(String(format: "F%.2g", aperture.doubleValue)) }
+            if let focal35 = exif[kCGImagePropertyExifFocalLenIn35mmFilm] as? NSNumber {
+                parts.append("\(focal35.intValue)mm")
+            } else if let focal = exif[kCGImagePropertyExifFocalLength] as? NSNumber {
+                parts.append(String(format: "%.1fmm", focal.doubleValue))
+            }
+            if let aperture = exif[kCGImagePropertyExifFNumber] as? NSNumber {
+                parts.append(String(format: "F%.2f", aperture.doubleValue))
+            }
             if let exposure = exif[kCGImagePropertyExifExposureTime] as? NSNumber {
                 let seconds = exposure.doubleValue
                 parts.append(seconds < 1 ? "1/\(max(Int((1 / seconds).rounded()), 1))s" : String(format: "%.1fs", seconds))
             }
-            if let iso = (exif[kCGImagePropertyExifISOSpeedRatings] as? [NSNumber])?.first { parts.append("ISO\(iso.intValue)") }
+            if let iso = (exif[kCGImagePropertyExifISOSpeedRatings] as? [NSNumber])?.first {
+                parts.append("ISO\(iso.intValue)")
+            } else if let iso = exif[kCGImagePropertyExifPhotographicSensitivity] as? NSNumber {
+                parts.append("ISO\(iso.intValue)")
+            }
             if !parts.isEmpty { value.exposure = parts.joined(separator: "  ") }
         }
         return value
