@@ -43,6 +43,7 @@ enum LivePhotoProcessor {
         for attempt in 0..<3 {
             do {
                 try await applyOnce(identifier: asset.localIdentifier, metadata: metadata, progress: progress)
+                try await validateLivePhoto(identifier: asset.localIdentifier)
                 return
             } catch {
                 lastError = error
@@ -130,6 +131,19 @@ enum LivePhotoProcessor {
                 }
             }
         }
+    }
+
+    private static func validateLivePhoto(identifier: String) async throws {
+        guard let asset = PHAsset.fetchAssets(
+            withLocalIdentifiers: [identifier], options: nil
+        ).firstObject, asset.mediaSubtypes.contains(.photoLive) else {
+            throw WatermarkError.livePhotoValidationFailed
+        }
+        let resources = PHAssetResource.assetResources(for: asset)
+        let hasPhoto = resources.contains { $0.type == .photo || $0.type == .fullSizePhoto }
+        let hasVideo = resources.contains { $0.type == .pairedVideo || $0.type == .fullSizePairedVideo }
+        guard hasPhoto, hasVideo else { throw WatermarkError.livePhotoValidationFailed }
+        try await warmLivePhoto(asset)
     }
 }
 

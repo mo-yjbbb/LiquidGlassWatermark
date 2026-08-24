@@ -45,7 +45,12 @@ enum MetadataReader {
             let make = (tiff[kCGImagePropertyTIFFMake] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
             let model = (tiff[kCGImagePropertyTIFFModel] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
             if let model, !model.isEmpty {
-                value.device = [make, model].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
+                if let make, !make.isEmpty,
+                   !model.lowercased().hasPrefix(make.lowercased()) {
+                    value.device = "\(make) \(model)"
+                } else {
+                    value.device = model
+                }
             }
         }
         if let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any] {

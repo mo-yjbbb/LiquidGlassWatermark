@@ -29,8 +29,9 @@ final class GlassRenderer: @unchecked Sendable {
         let extent = source.extent.integral
         guard extent.width > 0, extent.height > 0 else { return source }
         let layers = preparedLayers(for: extent)
-        let displaced = source.clampedToExtent().applyingFilter("CIDisplacementDistortion", parameters: [
-            "inputDisplacementImage": layers.displacement,
+        let displaced = source.clampedToExtent().applyingFilter("CIGlassDistortion", parameters: [
+            "inputTexture": layers.displacement,
+            kCIInputCenterKey: CIVector(x: extent.midX, y: extent.midY),
             kCIInputScaleKey: layers.displacementScale
         ]).cropped(to: extent)
         let glass = displaced.applyingFilter("CIBlendWithMask", parameters: [
@@ -60,9 +61,10 @@ final class GlassRenderer: @unchecked Sendable {
     }
 
     private func makeLayers(extent: CGRect) -> Layers {
-        let scale = max(min(extent.width, extent.height) / 1080, 0.65)
-        let margin = max(18 * scale, extent.width * 0.012)
-        let height = min(max(extent.height * 0.155, 164 * scale), extent.height * 0.22)
+        let shortSide = min(extent.width, extent.height)
+        let scale = max(shortSide / 1080, 0.35)
+        let margin = max(shortSide * 0.012, 8 * scale)
+        let height = shortSide * 0.108
         let rect = CGRect(x: margin, y: extent.height - margin - height,
                           width: extent.width - margin * 2, height: height)
         let radius = height * 0.47
@@ -74,20 +76,23 @@ final class GlassRenderer: @unchecked Sendable {
 
         let displacement = raster(size: extent.size, opaque: true) { renderer in
             let ctx = renderer.cgContext
-            UIColor(white: 0.5, alpha: 1).setFill()
+            UIColor.black.setFill()
             ctx.fill(CGRect(origin: .zero, size: extent.size))
             let path = UIBezierPath(roundedRect: rect, cornerRadius: radius)
             ctx.saveGState()
             path.addClip()
             let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-                UIColor(red: 0.43, green: 0.55, blue: 0.5, alpha: 1).cgColor,
-                UIColor(red: 0.58, green: 0.47, blue: 0.5, alpha: 1).cgColor,
-                UIColor(red: 0.47, green: 0.54, blue: 0.5, alpha: 1).cgColor
-            ] as CFArray, locations: [0, 0.5, 1])!
+                UIColor(white: 0.22, alpha: 1).cgColor,
+                UIColor(white: 0.72, alpha: 1).cgColor,
+                UIColor(white: 0.38, alpha: 1).cgColor
+            ] as CFArray, locations: [0, 0.42, 1])!
             ctx.drawLinearGradient(gradient,
-                start: CGPoint(x: rect.minX, y: rect.midY),
-                end: CGPoint(x: rect.maxX, y: rect.midY), options: [])
+                start: CGPoint(x: rect.midX, y: rect.minY),
+                end: CGPoint(x: rect.midX, y: rect.maxY), options: [])
             ctx.restoreGState()
+            UIColor.white.setStroke()
+            path.lineWidth = max(height * 0.12, 3)
+            path.stroke()
         }
 
         let overlay = raster(size: extent.size, opaque: false) { [metadata] renderer in
@@ -114,25 +119,46 @@ final class GlassRenderer: @unchecked Sendable {
             inner.lineWidth = max(scale, 1)
             inner.stroke()
 
-            let leftX = rect.minX + 48 * scale
-            let line1 = rect.minY + height * 0.23
-            let line2 = rect.minY + height * 0.61
+            let horizontalPadding = height * 0.34
+            let leftX = rect.minX + horizontalPadding
+            let leftMaxWidth = rect.width * 0.28
+            let modelSize = fittedFontSize(metadata.device, base: height * 0.22,
+                                           minimum: height * 0.16,
+                                           maxWidth: leftMaxWidth, weight: .semibold)
+            let dateSize = fittedFontSize(metadata.date, base: height * 0.16,
+                                          minimum: height * 0.12,
+                                          maxWidth: leftMaxWidth, weight: .regular)
+            let line1 = rect.minY + height * 0.17
+            let line2 = rect.minY + height * 0.56
             draw(metadata.device, at: CGPoint(x: leftX, y: line1),
-                 size: 35 * scale, weight: .semibold)
+                 size: modelSize, weight: .semibold)
             draw(metadata.date, at: CGPoint(x: leftX, y: line2),
-                 size: 24 * scale, weight: .regular, alpha: 0.9)
+                 size: dateSize, weight: .regular, alpha: 0.9)
 
-            let rightX = rect.maxX - min(rect.width * 0.32, 640 * scale)
-            draw("", at: CGPoint(x: rightX - 80 * scale, y: line1 - 12 * scale),
-                 size: 62 * scale, weight: .medium)
-            draw(metadata.exposure, at: CGPoint(x: rightX, y: line1),
-                 size: 28 * scale, weight: .medium)
-            draw(metadata.location, at: CGPoint(x: rightX, y: line2),
-                 size: 22 * scale, weight: .regular, alpha: 0.9)
+            let rightTextMaxWidth = rect.width * 0.255
+            let parameterSize = fittedFontSize(metadata.exposure, base: height * 0.18,
+                                               minimum: height * 0.125,
+                                               maxWidth: rightTextMaxWidth, weight: .medium)
+            let locationSize = fittedFontSize(metadata.location, base: height * 0.15,
+                                              minimum: height * 0.105,
+                                              maxWidth: rightTextMaxWidth, weight: .regular)
+            let rightTextWidth = max(textWidth(metadata.exposure, size: parameterSize, weight: .medium),
+                                     textWidth(metadata.location, size: locationSize, weight: .regular))
+            let rightX = rect.maxX - horizontalPadding - rightTextWidth
+            let logoSize = height * 0.47
+            let logoWidth = textWidth("", size: logoSize, weight: .medium)
+            let logoX = rightX - height * 0.20 - logoWidth
+            let logoHeight = UIFont.systemFont(ofSize: logoSize, weight: .medium).lineHeight
+            draw("", at: CGPoint(x: logoX, y: rect.midY - logoHeight * 0.5),
+                 size: logoSize, weight: .medium)
+            draw(metadata.exposure, at: CGPoint(x: rightX, y: rect.minY + height * 0.19),
+                 size: parameterSize, weight: .medium)
+            draw(metadata.location, at: CGPoint(x: rightX, y: rect.minY + height * 0.56),
+                 size: locationSize, weight: .regular, alpha: 0.9)
         }
 
         return Layers(extent: extent, mask: mask, displacement: displacement,
-                      overlay: overlay, displacementScale: 46 * scale)
+                      overlay: overlay, displacementScale: height * 0.34)
     }
 
     private func raster(size: CGSize, opaque: Bool,
@@ -157,5 +183,19 @@ private func draw(_ text: String, at point: CGPoint, size: CGFloat,
         .foregroundColor: UIColor.white.withAlphaComponent(alpha),
         .shadow: shadow
     ])
+}
+
+private func textWidth(_ text: String, size: CGFloat, weight: UIFont.Weight) -> CGFloat {
+    (text as NSString).size(withAttributes: [
+        .font: UIFont.systemFont(ofSize: size, weight: weight)
+    ]).width
+}
+
+private func fittedFontSize(_ text: String, base: CGFloat, minimum: CGFloat,
+                            maxWidth: CGFloat, weight: UIFont.Weight) -> CGFloat {
+    guard !text.isEmpty else { return base }
+    let width = textWidth(text, size: base, weight: weight)
+    guard width > maxWidth, width > 0 else { return base }
+    return max(minimum, base * maxWidth / width)
 }
 

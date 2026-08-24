@@ -89,7 +89,11 @@ private struct AssetPicker: UIViewControllerRepresentable {
                 return
             }
             let provider = result.itemProvider
-            let isLive = provider.hasItemConformingToTypeIdentifier(UTType.livePhoto.identifier)
+            let librarySaysLive = result.assetIdentifier.flatMap {
+                PHAsset.fetchAssets(withLocalIdentifiers: [$0], options: nil).firstObject
+            }?.mediaSubtypes.contains(.photoLive) == true
+            let isLive = librarySaysLive
+                || provider.hasItemConformingToTypeIdentifier(UTType.livePhoto.identifier)
             provider.loadFileRepresentation(forTypeIdentifier: UTType.image.identifier) { [weak self] url, _ in
                 guard let self else { return }
                 guard let url else {

@@ -10,7 +10,7 @@ final class MetadataRendererTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: url) }
 
         let metadata = MetadataReader.read(asset: nil, imageURL: url)
-        XCTAssertEqual(metadata.device, "Xiaomi Xiaomi 15 Pro")
+        XCTAssertEqual(metadata.device, "Xiaomi 15 Pro")
         XCTAssertEqual(metadata.date, "2026.08.24 16:15:01")
         XCTAssertTrue(metadata.exposure.contains("24mm"))
         XCTAssertTrue(metadata.exposure.contains("F1.78"))

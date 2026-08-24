@@ -60,7 +60,7 @@ final class WatermarkModel: ObservableObject {
 
 enum WatermarkError: LocalizedError {
     case photoPermissionDenied, assetUnavailable, notLivePhoto, missingResource, renderFailed, metadataUnavailable
-    case photoReadFailed(String), livePhotoLibraryAccessRequired
+    case photoReadFailed(String), livePhotoLibraryAccessRequired, livePhotoValidationFailed
 
     var errorDescription: String? {
         switch self {
@@ -72,6 +72,7 @@ enum WatermarkError: LocalizedError {
         case .metadataUnavailable: "照片缺少机型、时间、摄像参数或位置，无法生成完整参数水印"
         case .photoReadFailed(let detail): "读取原图失败：\(detail)"
         case .livePhotoLibraryAccessRequired: "无法访问所选 Live Photo 的视频资源，请授予照片完全访问权限"
+        case .livePhotoValidationFailed: "输出没有保留完整的 Live Photo 图片和配对视频，已判定处理失败"
         }
     }
 }
