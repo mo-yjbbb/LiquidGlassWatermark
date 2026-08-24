@@ -14,8 +14,10 @@ iOS 26 本地照片/Live Photo 水印工具。所有图像处理均在设备上�
 
 1. 将本目录内容推送到 GitHub 仓库。
 2. 打开 Actions，运行 **Build unsigned IPA**。
-3. 在构建结果的 Artifacts 中下载 `LiquidGlassWatermark-adhoc`。
-4. 解压得到 `LiquidGlassWatermark-adhoc.ipa`，自行签名后安装。IPA 带有可被重签工具替换的 ad-hoc 签名，不包含开发者证书或描述文件。
+3. 在构建结果的 Artifacts 中下载 `LiquidGlassWatermark-signer-compatible`。
+4. 爱思助手使用 `LiquidGlassWatermark-adhoc.ipa`；Sideloadly 使用 `LiquidGlassWatermark-clean.ipa`。
+
+两个 IPA 均不包含开发者证书、Apple ID、设备 ID 或描述文件。ad-hoc 版只带可被重签工具替换的本地占位签名。
 
 工作流不读取证书、Apple ID 或描述文件。
 
