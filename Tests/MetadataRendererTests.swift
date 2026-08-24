@@ -56,6 +56,22 @@ final class MetadataRendererTests: XCTestCase {
                                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         context.setFillColor(red: 0.28, green: 0.48, blue: 0.72, alpha: 1)
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        for x in stride(from: 0, to: width, by: 48) {
+            let bright = (x / 48).isMultiple(of: 2)
+            context.setFillColor(red: bright ? 0.78 : 0.16,
+                                 green: bright ? 0.58 : 0.32,
+                                 blue: bright ? 0.22 : 0.68, alpha: 0.72)
+            context.fill(CGRect(x: x, y: 0, width: 24, height: height))
+        }
+        context.setLineWidth(6)
+        for y in stride(from: 40, to: height, by: 72) {
+            context.setStrokeColor(red: 1, green: 1, blue: 1, alpha: 0.32)
+            context.move(to: CGPoint(x: 0, y: y))
+            context.addCurve(to: CGPoint(x: width, y: y + 20),
+                             control1: CGPoint(x: width * 0.3, y: y + 36),
+                             control2: CGPoint(x: width * 0.7, y: y - 20))
+            context.strokePath()
+        }
         let image = context.makeImage()!
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString).appendingPathExtension("jpg")
