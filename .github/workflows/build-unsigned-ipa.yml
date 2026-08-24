@@ -32,6 +32,11 @@ jobs:
           APP="build/Build/Products/Release-iphoneos/LiquidGlassWatermark.app"
           test -f "$APP/LiquidGlassWatermark"
           /usr/bin/file "$APP/LiquidGlassWatermark" | grep -q "Mach-O 64-bit executable arm64"
+          EXECUTABLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")
+          BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
+          test "$EXECUTABLE" = "LiquidGlassWatermark"
+          test "$BUNDLE_ID" = "com.localwatermark.liquidglass"
+          test -x "$APP/$EXECUTABLE"
           rm -rf package-clean package-adhoc verify
           mkdir -p package-clean/Payload package-adhoc/Payload verify
           cp -R "$APP" package-clean/Payload/
