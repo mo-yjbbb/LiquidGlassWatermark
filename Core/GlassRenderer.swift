@@ -101,21 +101,21 @@ final class GlassRenderer: @unchecked Sendable {
             ctx.saveGState()
             path.addClip()
             let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-                UIColor.white.withAlphaComponent(0.23).cgColor,
-                UIColor.white.withAlphaComponent(0.035).cgColor,
-                UIColor.black.withAlphaComponent(0.13).cgColor
+                UIColor.white.withAlphaComponent(0.16).cgColor,
+                UIColor.white.withAlphaComponent(0.018).cgColor,
+                UIColor.black.withAlphaComponent(0.075).cgColor
             ] as CFArray, locations: [0, 0.52, 1])!
             ctx.drawLinearGradient(gradient,
                 start: CGPoint(x: rect.midX, y: rect.minY),
                 end: CGPoint(x: rect.midX, y: rect.maxY), options: [])
             ctx.restoreGState()
 
-            UIColor.white.withAlphaComponent(0.82).setStroke()
-            path.lineWidth = max(2.2 * scale, 1.5)
+            UIColor.white.withAlphaComponent(0.58).setStroke()
+            path.lineWidth = max(1.45 * scale, 1.2)
             path.stroke()
             let inner = UIBezierPath(roundedRect: rect.insetBy(dx: 4 * scale, dy: 4 * scale),
                                      cornerRadius: radius - 4 * scale)
-            UIColor.black.withAlphaComponent(0.24).setStroke()
+            UIColor.black.withAlphaComponent(0.16).setStroke()
             inner.lineWidth = max(scale, 1)
             inner.stroke()
 
@@ -158,7 +158,7 @@ final class GlassRenderer: @unchecked Sendable {
         }
 
         return Layers(extent: extent, mask: mask, displacement: displacement,
-                      overlay: overlay, displacementScale: height * 0.34)
+                      overlay: overlay, displacementScale: height * 0.88)
     }
 
     private func raster(size: CGSize, opaque: Bool,
