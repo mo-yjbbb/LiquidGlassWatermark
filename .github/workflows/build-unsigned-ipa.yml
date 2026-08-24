@@ -29,7 +29,7 @@ jobs:
       - name: Package IPA
         run: |
           mkdir -p Payload
-          cp -R "build/Build/Products/Release-iphoneos/液态玻璃水印.app" Payload/
+          cp -R "build/Build/Products/Release-iphoneos/LiquidGlassWatermark.app" Payload/
           ditto -c -k --sequesterRsrc --keepParent Payload LiquidGlassWatermark-unsigned.ipa
       - uses: actions/upload-artifact@v4
         with:
