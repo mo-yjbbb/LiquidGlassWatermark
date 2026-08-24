@@ -17,8 +17,8 @@ targets:
       - App
       - Core
       - Intents
-    resources:
-      - Resources/Assets.xcassets
+      - path: Resources/Assets.xcassets
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.localwatermark.liquidglass
