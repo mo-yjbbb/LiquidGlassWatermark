@@ -30,7 +30,7 @@ final class GlassRenderer: @unchecked Sendable {
         guard extent.width > 0, extent.height > 0 else { return source }
         let layers = preparedLayers(for: extent)
         let displaced = source.clampedToExtent().applyingFilter("CIDisplacementDistortion", parameters: [
-            kCIInputDisplacementImageKey: layers.displacement,
+            "inputDisplacementImage": layers.displacement,
             kCIInputScaleKey: layers.displacementScale
         ]).cropped(to: extent)
         let glass = displaced.applyingFilter("CIBlendWithMask", parameters: [
