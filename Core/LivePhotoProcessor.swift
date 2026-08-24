@@ -1,11 +1,17 @@
 import Photos
 import CoreImage
+import AVFoundation
 
 enum LivePhotoProcessor {
     static func duplicate(asset: PHAsset) async throws -> PHAsset {
         let resources = PHAssetResource.assetResources(for: asset)
-        guard let photo = resources.first(where: { $0.type == .photo || $0.type == .fullSizePhoto }),
-              let video = resources.first(where: { $0.type == .pairedVideo || $0.type == .fullSizePairedVideo }) else {
+        let fullSizePair = resources.first(where: { $0.type == .fullSizePhoto }).flatMap { photo in
+            resources.first(where: { $0.type == .fullSizePairedVideo }).map { (photo, $0) }
+        }
+        let originalPair = resources.first(where: { $0.type == .photo }).flatMap { photo in
+            resources.first(where: { $0.type == .pairedVideo }).map { (photo, $0) }
+        }
+        guard let (photo, video) = fullSizePair ?? originalPair else {
             throw WatermarkError.missingResource
         }
         let photoURL = try await PhotoResourceLoader.localURL(for: photo)
@@ -34,6 +40,7 @@ enum LivePhotoProcessor {
               let copy = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject else {
             throw WatermarkError.assetUnavailable
         }
+        try await validatePlayableCurrentVersion(identifier: identifier)
         return copy
     }
 
@@ -71,6 +78,7 @@ enum LivePhotoProcessor {
             if duration > 0 { progress(min(max(frame.time.seconds / duration, 0), 1)) }
             return renderer.render(frame.image)
         }
+        context.audioVolume = 1
         let output = PHContentEditingOutput(contentEditingInput: input)
         output.adjustmentData = PHAdjustmentData(
             formatIdentifier: "com.localwatermark.liquidglass",
@@ -144,6 +152,32 @@ enum LivePhotoProcessor {
         let hasVideo = resources.contains { $0.type == .pairedVideo || $0.type == .fullSizePairedVideo }
         guard hasPhoto, hasVideo else { throw WatermarkError.livePhotoValidationFailed }
         try await warmLivePhoto(asset)
+        try await validatePlayableCurrentVersion(identifier: identifier)
+    }
+
+    private static func validatePlayableCurrentVersion(identifier: String) async throws {
+        var lastError: Error = WatermarkError.livePhotoValidationFailed
+        for attempt in 0..<8 {
+            if attempt > 0 { try await Task.sleep(for: .milliseconds(650)) }
+            guard let asset = PHAsset.fetchAssets(
+                withLocalIdentifiers: [identifier], options: nil
+            ).firstObject else { continue }
+            do {
+                let input = try await asset.contentEditingInput()
+                guard input.livePhoto != nil, let audiovisualAsset = input.audiovisualAsset else {
+                    throw WatermarkError.livePhotoValidationFailed
+                }
+                let duration = try await audiovisualAsset.load(.duration)
+                let videoTracks = try await audiovisualAsset.loadTracks(withMediaType: .video)
+                guard duration.seconds.isFinite, duration.seconds > 0.1, !videoTracks.isEmpty else {
+                    throw WatermarkError.livePhotoValidationFailed
+                }
+                return
+            } catch {
+                lastError = error
+            }
+        }
+        throw lastError
     }
 }
 
