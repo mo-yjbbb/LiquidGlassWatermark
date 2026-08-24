@@ -18,7 +18,7 @@ jobs:
       - name: Run metadata and renderer simulation tests
         run: |
           set -euo pipefail
-          xcodebuild test +            -project LiquidGlassWatermark.xcodeproj +            -scheme LiquidGlassWatermark +            -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=latest' +            CODE_SIGNING_ALLOWED=NO
+          xcodebuild test -project LiquidGlassWatermark.xcodeproj -scheme LiquidGlassWatermark -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=latest' CODE_SIGNING_ALLOWED=NO
       - name: Build without signing
         run: |
           xcodebuild \
