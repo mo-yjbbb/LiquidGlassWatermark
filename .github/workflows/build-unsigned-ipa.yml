@@ -18,7 +18,9 @@ jobs:
       - name: Run metadata and renderer simulation tests
         run: |
           set -euo pipefail
-          xcodebuild test -project LiquidGlassWatermark.xcodeproj -scheme LiquidGlassWatermark -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=latest' CODE_SIGNING_ALLOWED=NO
+          rm -rf TestResults.xcresult TestAttachments
+          xcodebuild test -project LiquidGlassWatermark.xcodeproj -scheme LiquidGlassWatermark -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=latest' -resultBundlePath TestResults.xcresult CODE_SIGNING_ALLOWED=NO
+          xcrun xcresulttool export attachments --path TestResults.xcresult --output-path TestAttachments
       - name: Build without signing
         run: |
           xcodebuild \
@@ -76,4 +78,5 @@ jobs:
           path: |
             LiquidGlassWatermark-clean.ipa
             LiquidGlassWatermark-adhoc.ipa
+            TestAttachments
 

@@ -2,6 +2,7 @@ import XCTest
 import CoreImage
 import ImageIO
 import UniformTypeIdentifiers
+import UIKit
 @testable import LiquidGlassWatermark
 
 final class MetadataRendererTests: XCTestCase {
@@ -25,8 +26,15 @@ final class MetadataRendererTests: XCTestCase {
         let second = renderer.render(source!)
         XCTAssertEqual(first.extent, source!.extent)
         XCTAssertEqual(second.extent, source!.extent)
-        XCTAssertNotNil(renderer.makeCGImage(first))
+        let rendered = renderer.makeCGImage(first)
+        XCTAssertNotNil(rendered)
         XCTAssertNotNil(renderer.makeCGImage(second))
+        if let rendered {
+            let attachment = XCTAttachment(image: UIImage(cgImage: rendered))
+            attachment.name = "reference-layout-preview"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
     }
 
     func testMissingMetadataIsRejectedByValidationInputs() throws {
