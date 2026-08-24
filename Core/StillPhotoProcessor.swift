@@ -4,9 +4,9 @@ import UIKit
 
 enum StillPhotoProcessor {
     static func process(asset: PHAsset, metadata: WatermarkMetadata) async throws {
-        let input = try await asset.contentEditingInput()
-        guard let url = input.fullSizeImageURL,
-              let ciImage = CIImage(contentsOf: url, options: [.applyOrientationProperty: true]) else {
+        let url = try await PhotoResourceLoader.imageURL(for: asset)
+        defer { try? FileManager.default.removeItem(at: url) }
+        guard let ciImage = CIImage(contentsOf: url, options: [.applyOrientationProperty: true]) else {
             throw WatermarkError.assetUnavailable
         }
         let renderer = GlassRenderer(metadata: metadata)

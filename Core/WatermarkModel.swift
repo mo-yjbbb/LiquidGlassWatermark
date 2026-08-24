@@ -22,8 +22,9 @@ final class WatermarkModel: ObservableObject {
             let result = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil)
             guard let asset = result.firstObject else { throw WatermarkError.assetUnavailable }
             status = "读取真实拍摄参数"
-            let sourceInput = try await asset.contentEditingInput()
-            let metadata = MetadataReader.read(asset: asset, input: sourceInput)
+            let sourceURL = try await PhotoResourceLoader.imageURL(for: asset)
+            let metadata = MetadataReader.read(asset: asset, imageURL: sourceURL)
+            try? FileManager.default.removeItem(at: sourceURL)
             guard !metadata.device.isEmpty, !metadata.exposure.isEmpty, !metadata.date.isEmpty else {
                 throw WatermarkError.metadataUnavailable
             }

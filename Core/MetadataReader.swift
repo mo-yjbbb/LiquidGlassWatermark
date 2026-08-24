@@ -2,7 +2,7 @@ import Photos
 import ImageIO
 
 enum MetadataReader {
-    static func read(asset: PHAsset, input: PHContentEditingInput?) -> WatermarkMetadata {
+    static func read(asset: PHAsset, imageURL: URL) -> WatermarkMetadata {
         var value = WatermarkMetadata()
         if let date = asset.creationDate {
             let formatter = DateFormatter()
@@ -12,8 +12,7 @@ enum MetadataReader {
         if let location = asset.location {
             value.location = String(format: "%.5f°, %.5f°", location.coordinate.latitude, location.coordinate.longitude)
         }
-        guard let url = input?.fullSizeImageURL,
-              let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+        guard let source = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else {
             return value
         }
@@ -40,7 +39,7 @@ enum MetadataReader {
             }
             if let iso = (exif[kCGImagePropertyExifISOSpeedRatings] as? [NSNumber])?.first {
                 parts.append("ISO\(iso.intValue)")
-            } else if let iso = exif["PhotographicSensitivity" as CFString] as? NSNumber {
+            } else if let iso = exif["PhotographicSensitivity"] as? NSNumber {
                 parts.append("ISO\(iso.intValue)")
             }
             if !parts.isEmpty { value.exposure = parts.joined(separator: "  ") }

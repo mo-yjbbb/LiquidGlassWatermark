@@ -8,13 +8,12 @@ enum LivePhotoProcessor {
               let video = resources.first(where: { $0.type == .pairedVideo || $0.type == .fullSizePairedVideo }) else {
             throw WatermarkError.missingResource
         }
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: folder) }
-        let photoURL = folder.appendingPathComponent(photo.originalFilename)
-        let videoURL = folder.appendingPathComponent(video.originalFilename)
-        try await write(photo, to: photoURL)
-        try await write(video, to: videoURL)
+        let photoURL = try await PhotoResourceLoader.localURL(for: photo)
+        let videoURL = try await PhotoResourceLoader.localURL(for: video)
+        defer {
+            try? FileManager.default.removeItem(at: photoURL)
+            try? FileManager.default.removeItem(at: videoURL)
+        }
 
         var identifier: String?
         try await PHPhotoLibrary.shared().performChanges {
@@ -34,7 +33,22 @@ enum LivePhotoProcessor {
 
     static func applyWatermark(to asset: PHAsset, metadata: WatermarkMetadata,
                                progress: @escaping @Sendable (Double) -> Void) async throws {
-        let (readyAsset, input) = try await readyInput(for: asset.localIdentifier)
+        var lastError: Error = WatermarkError.renderFailed
+        for attempt in 0..<3 {
+            do {
+                try await applyOnce(identifier: asset.localIdentifier, metadata: metadata, progress: progress)
+                return
+            } catch {
+                lastError = error
+                if attempt < 2 { try await Task.sleep(for: .seconds(2 * (attempt + 1))) }
+            }
+        }
+        throw lastError
+    }
+
+    private static func applyOnce(identifier: String, metadata: WatermarkMetadata,
+                                  progress: @escaping @Sendable (Double) -> Void) async throws {
+        let (readyAsset, input) = try await readyInput(for: identifier)
         guard let context = PHLivePhotoEditingContext(livePhotoEditingInput: input) else {
             throw WatermarkError.notLivePhoto
         }
@@ -81,17 +95,6 @@ enum LivePhotoProcessor {
             }
         }
         throw lastError
-    }
-
-    private static func write(_ resource: PHAssetResource, to url: URL) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            let options = PHAssetResourceRequestOptions()
-            options.isNetworkAccessAllowed = true
-            PHAssetResourceManager.default().writeData(for: resource, toFile: url, options: options) { error in
-                if let error { continuation.resume(throwing: error) }
-                else { continuation.resume() }
-            }
-        }
     }
 }
 

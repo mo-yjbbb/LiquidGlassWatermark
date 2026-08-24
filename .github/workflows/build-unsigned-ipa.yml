@@ -37,6 +37,10 @@ jobs:
           test "$EXECUTABLE" = "LiquidGlassWatermark"
           test "$BUNDLE_ID" = "com.localwatermark.liquidglass"
           test -x "$APP/$EXECUTABLE"
+          test -f "$APP/Assets.car"
+          xcrun --find assetutil >/dev/null
+          xcrun assetutil --info "$APP/Assets.car" > asset-info.json
+          grep -q 'AppIcon' asset-info.json
           rm -rf package-clean package-adhoc verify
           mkdir -p package-clean/Payload package-adhoc/Payload verify
           cp -R "$APP" package-clean/Payload/
