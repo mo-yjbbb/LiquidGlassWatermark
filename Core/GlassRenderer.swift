@@ -110,13 +110,24 @@ final class GlassRenderer: @unchecked Sendable {
                 end: CGPoint(x: rect.midX, y: rect.maxY), options: [])
             ctx.restoreGState()
 
-            UIColor.white.withAlphaComponent(0.58).setStroke()
-            path.lineWidth = max(1.45 * scale, 1.2)
-            path.stroke()
+            ctx.saveGState()
+            ctx.addPath(path.cgPath)
+            ctx.setLineWidth(max(1.35 * scale, 1))
+            ctx.replacePathWithStrokedPath()
+            ctx.clip()
+            let edgeHighlight = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
+                UIColor.white.withAlphaComponent(0.72).cgColor,
+                UIColor.white.withAlphaComponent(0.20).cgColor,
+                UIColor.white.withAlphaComponent(0.035).cgColor
+            ] as CFArray, locations: [0, 0.48, 1])!
+            ctx.drawLinearGradient(edgeHighlight,
+                start: CGPoint(x: rect.midX, y: rect.minY),
+                end: CGPoint(x: rect.midX, y: rect.maxY), options: [])
+            ctx.restoreGState()
             let inner = UIBezierPath(roundedRect: rect.insetBy(dx: 4 * scale, dy: 4 * scale),
                                      cornerRadius: radius - 4 * scale)
-            UIColor.black.withAlphaComponent(0.16).setStroke()
-            inner.lineWidth = max(scale, 1)
+            UIColor.black.withAlphaComponent(0.075).setStroke()
+            inner.lineWidth = max(0.7 * scale, 0.7)
             inner.stroke()
 
             let horizontalPadding = height * 0.34
