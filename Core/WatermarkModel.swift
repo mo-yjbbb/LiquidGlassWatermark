@@ -32,13 +32,10 @@ final class WatermarkModel: ObservableObject {
 
             if selection.isLivePhoto {
                 guard let asset else { throw WatermarkError.livePhotoLibraryAccessRequired }
-                status = "复制 Live Photo"
+                status = "重建标准 Live Photo"
                 progress = 0.15
-                let copy = try await LivePhotoProcessor.duplicate(asset: asset)
-                status = "逐帧渲染液态玻璃"
-                progress = 0.35
-                try await LivePhotoProcessor.applyWatermark(to: copy, metadata: metadata) { [weak self] value in
-                    Task { @MainActor in self?.progress = 0.35 + value * 0.6 }
+                try await LivePhotoProcessor.process(asset: asset, metadata: metadata) { [weak self] value in
+                    Task { @MainActor in self?.progress = 0.15 + value * 0.8 }
                 }
                 resultMessage = "已保存新的带水印 Live Photo"
             } else {
