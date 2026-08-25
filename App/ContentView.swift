@@ -107,7 +107,8 @@ private struct AssetPicker: UIViewControllerRepresentable {
                 do {
                     try FileManager.default.copyItem(at: url, to: copy)
                     let selection = PickedPhoto(localIdentifier: result.assetIdentifier,
-                                                imageURL: copy, isLivePhoto: isLive)
+                                                imageURL: copy,
+                                                isLivePhoto: isLive || MotionPhotoExtractor.containsEmbeddedVideo(at: copy))
                     DispatchQueue.main.async { self.completion(selection) }
                 } catch {
                     self.loadImageData(provider: provider, result: result, isLive: isLive)
@@ -127,7 +128,8 @@ private struct AssetPicker: UIViewControllerRepresentable {
                 do {
                     try data.write(to: copy, options: .atomic)
                     let selection = PickedPhoto(localIdentifier: result.assetIdentifier,
-                                                imageURL: copy, isLivePhoto: isLive)
+                                                imageURL: copy,
+                                                isLivePhoto: isLive || MotionPhotoExtractor.containsEmbeddedVideo(at: copy))
                     DispatchQueue.main.async { completion(selection) }
                 } catch {
                     DispatchQueue.main.async { completion(nil) }

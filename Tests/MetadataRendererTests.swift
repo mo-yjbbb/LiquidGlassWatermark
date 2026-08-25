@@ -47,6 +47,30 @@ final class MetadataRendererTests: XCTestCase {
         XCTAssertTrue(metadata.location.isEmpty)
     }
 
+    func testEmbeddedMotionPhotoExtraction() throws {
+        let url = try makeFixture(includeMetadata: true)
+        let motionURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString).appendingPathExtension("jpg")
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            try? FileManager.default.removeItem(at: motionURL)
+            try? FileManager.default.removeItem(at: directory)
+        }
+        var combined = try Data(contentsOf: url)
+        combined.append(Data([0, 0, 0, 16, 0x66, 0x74, 0x79, 0x70,
+                              0x69, 0x73, 0x6f, 0x6d, 0, 0, 0, 0]))
+        try combined.write(to: motionURL)
+        XCTAssertTrue(MotionPhotoExtractor.containsEmbeddedVideo(at: motionURL))
+        let extracted = try MotionPhotoExtractor.extract(from: motionURL, to: directory)
+        XCTAssertGreaterThan((try Data(contentsOf: extracted.photoURL)).count, 0)
+        XCTAssertEqual(try Data(contentsOf: extracted.videoURL),
+                       Data([0, 0, 0, 16, 0x66, 0x74, 0x79, 0x70,
+                             0x69, 0x73, 0x6f, 0x6d, 0, 0, 0, 0]))
+    }
+
     private func makeFixture(includeMetadata: Bool) throws -> URL {
         let width = 1600
         let height = 1000

@@ -31,10 +31,11 @@ final class WatermarkModel: ObservableObject {
             }
 
             if selection.isLivePhoto {
-                guard let asset else { throw WatermarkError.livePhotoLibraryAccessRequired }
                 status = "重建标准 Live Photo"
                 progress = 0.15
-                try await LivePhotoProcessor.process(asset: asset, metadata: metadata) { [weak self] value in
+                try await LivePhotoProcessor.process(asset: asset,
+                                                     selectedImageURL: selection.imageURL,
+                                                     metadata: metadata) { [weak self] value in
                     Task { @MainActor in self?.progress = 0.15 + value * 0.8 }
                 }
                 resultMessage = "已保存新的带水印 Live Photo"

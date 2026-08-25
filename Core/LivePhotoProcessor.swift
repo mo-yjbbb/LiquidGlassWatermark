@@ -4,17 +4,26 @@ import AVFoundation
 import UIKit
 
 enum LivePhotoProcessor {
-    static func process(asset: PHAsset, metadata: WatermarkMetadata,
+    static func process(asset: PHAsset?, selectedImageURL: URL, metadata: WatermarkMetadata,
                         progress: @escaping @Sendable (Double) -> Void) async throws {
-        let pair = try matchedResources(for: asset)
-        let sourcePhoto = try await PhotoResourceLoader.localURL(for: pair.photo)
-        let sourceVideo = try await PhotoResourceLoader.localURL(for: pair.video)
         let work = FileManager.default.temporaryDirectory.appendingPathComponent("LGW-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        var externalTemporaryFiles: [URL] = []
         defer {
-            try? FileManager.default.removeItem(at: sourcePhoto)
-            try? FileManager.default.removeItem(at: sourceVideo)
+            externalTemporaryFiles.forEach { try? FileManager.default.removeItem(at: $0) }
             try? FileManager.default.removeItem(at: work)
+        }
+        let sourcePhoto: URL
+        let sourceVideo: URL
+        if let asset, let pair = try? matchedResources(for: asset) {
+            sourcePhoto = try await PhotoResourceLoader.localURL(for: pair.photo)
+            externalTemporaryFiles.append(sourcePhoto)
+            sourceVideo = try await PhotoResourceLoader.localURL(for: pair.video)
+            externalTemporaryFiles.append(sourceVideo)
+        } else {
+            let extracted = try MotionPhotoExtractor.extract(from: selectedImageURL, to: work)
+            sourcePhoto = extracted.photoURL
+            sourceVideo = extracted.videoURL
         }
         let renderedPhoto = work.appendingPathComponent("rendered.jpg")
         let renderedVideo = work.appendingPathComponent("rendered.mov")
@@ -25,13 +34,13 @@ enum LivePhotoProcessor {
             progress(0.12 + $0 * 0.68)
         }
         let assembled = try await LivePhotoAssembler().makePair(
-            photoURL: renderedPhoto, metadataSourceURL: sourcePhoto,
+            photoURL: renderedPhoto, metadataSourceURL: nil,
             videoURL: renderedVideo, in: work
         )
         progress(0.88)
         try await preflight(photoURL: assembled.photoURL, videoURL: assembled.videoURL)
         try await save(photoURL: assembled.photoURL, videoURL: assembled.videoURL,
-                       creationDate: asset.creationDate, location: asset.location)
+                       creationDate: asset?.creationDate, location: asset?.location)
         progress(1)
     }
 
