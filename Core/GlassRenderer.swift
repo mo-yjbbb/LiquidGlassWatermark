@@ -29,9 +29,8 @@ final class GlassRenderer: @unchecked Sendable {
         let extent = source.extent.integral
         guard extent.width > 0, extent.height > 0 else { return source }
         let layers = preparedLayers(for: extent)
-        let displaced = source.clampedToExtent().applyingFilter("CIGlassDistortion", parameters: [
-            "inputTexture": layers.displacement,
-            kCIInputCenterKey: CIVector(x: extent.midX, y: extent.midY),
+        let displaced = source.clampedToExtent().applyingFilter("CIDisplacementDistortion", parameters: [
+            "inputDisplacementImage": layers.displacement,
             kCIInputScaleKey: layers.displacementScale
         ]).cropped(to: extent)
         let glass = displaced.applyingFilter("CIBlendWithMask", parameters: [
@@ -76,23 +75,31 @@ final class GlassRenderer: @unchecked Sendable {
 
         let displacement = raster(size: extent.size, opaque: true) { renderer in
             let ctx = renderer.cgContext
-            UIColor.black.setFill()
+            UIColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1).setFill()
             ctx.fill(CGRect(origin: .zero, size: extent.size))
             let path = UIBezierPath(roundedRect: rect, cornerRadius: radius)
             ctx.saveGState()
             path.addClip()
-            let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-                UIColor(white: 0.22, alpha: 1).cgColor,
-                UIColor(white: 0.72, alpha: 1).cgColor,
-                UIColor(white: 0.38, alpha: 1).cgColor
-            ] as CFArray, locations: [0, 0.42, 1])!
-            ctx.drawLinearGradient(gradient,
+            UIColor.black.setFill()
+            ctx.fill(rect)
+            let horizontal = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
+                UIColor(red: 0.30, green: 0, blue: 0.25, alpha: 1).cgColor,
+                UIColor(red: 0.50, green: 0, blue: 0.25, alpha: 1).cgColor,
+                UIColor(red: 0.70, green: 0, blue: 0.25, alpha: 1).cgColor
+            ] as CFArray, locations: [0, 0.5, 1])!
+            ctx.drawLinearGradient(horizontal,
+                start: CGPoint(x: rect.minX, y: rect.midY),
+                end: CGPoint(x: rect.maxX, y: rect.midY), options: [])
+            ctx.setBlendMode(.plusLighter)
+            let vertical = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
+                UIColor(red: 0, green: 0.30, blue: 0.25, alpha: 1).cgColor,
+                UIColor(red: 0, green: 0.50, blue: 0.25, alpha: 1).cgColor,
+                UIColor(red: 0, green: 0.70, blue: 0.25, alpha: 1).cgColor
+            ] as CFArray, locations: [0, 0.5, 1])!
+            ctx.drawLinearGradient(vertical,
                 start: CGPoint(x: rect.midX, y: rect.minY),
                 end: CGPoint(x: rect.midX, y: rect.maxY), options: [])
             ctx.restoreGState()
-            UIColor.white.setStroke()
-            path.lineWidth = max(height * 0.12, 3)
-            path.stroke()
         }
 
         let overlay = raster(size: extent.size, opaque: false) { [metadata] renderer in
@@ -165,7 +172,7 @@ final class GlassRenderer: @unchecked Sendable {
         }
 
         return Layers(extent: extent, mask: mask, displacement: displacement,
-                      overlay: overlay, displacementScale: height * 0.88)
+                      overlay: overlay, displacementScale: height * 0.34)
     }
 
     private func raster(size: CGSize, opaque: Bool,
