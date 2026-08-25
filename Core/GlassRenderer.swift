@@ -64,7 +64,8 @@ final class GlassRenderer: @unchecked Sendable {
         let scale = max(shortSide / 1080, 0.35)
         let margin = max(shortSide * 0.012, 8 * scale)
         let height = shortSide * 0.108
-        let rect = CGRect(x: margin, y: extent.height - margin - height,
+        // Core Image uses a bottom-left origin. Keep the capsule at the visual bottom.
+        let rect = CGRect(x: margin, y: margin,
                           width: extent.width - margin * 2, height: height)
         let radius = height * 0.47
         let panelRect = CGRect(origin: .zero, size: rect.size)
