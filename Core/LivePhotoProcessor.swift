@@ -47,8 +47,18 @@ enum LivePhotoProcessor {
 
     private static func renderStill(_ sourceURL: URL, to outputURL: URL,
                                     renderer: GlassRenderer) throws {
-        guard let source = CIImage(contentsOf: sourceURL, options: [.applyOrientationProperty: true]),
-              let cg = renderer.makeCGImage(renderer.render(source)),
+        guard let original = CIImage(contentsOf: sourceURL, options: [.applyOrientationProperty: true]) else {
+            throw WatermarkError.renderFailed
+        }
+        let longest = max(original.extent.width, original.extent.height)
+        let scale = min(1, 4096 / max(longest, 1))
+        let source = scale < 1
+            ? original.applyingFilter("CILanczosScaleTransform", parameters: [
+                kCIInputScaleKey: scale,
+                kCIInputAspectRatioKey: 1
+            ])
+            : original
+        guard let cg = renderer.makeCGImage(renderer.render(source)),
               let data = UIImage(cgImage: cg).jpegData(compressionQuality: 0.96) else {
             throw WatermarkError.renderFailed
         }
