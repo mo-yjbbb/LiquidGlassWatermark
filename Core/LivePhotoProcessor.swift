@@ -82,7 +82,11 @@ enum LivePhotoProcessor {
             throw WatermarkError.renderFailed
         }
         let composition = AVVideoComposition(asset: asset) { request in
-            request.finish(with: renderer.render(request.sourceImage.clampedToExtent())
+            // request.sourceImage has the finite frame extent required by the
+            // renderer. clampedToExtent() is intentionally not used here: it
+            // creates an infinite CIImage and traps when the renderer builds
+            // its integer cache key.
+            request.finish(with: renderer.render(request.sourceImage)
                 .cropped(to: request.sourceImage.extent), context: nil)
         }
         try? FileManager.default.removeItem(at: outputURL)

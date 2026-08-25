@@ -27,7 +27,10 @@ final class GlassRenderer: @unchecked Sendable {
 
     func render(_ source: CIImage) -> CIImage {
         let extent = source.extent.integral
-        guard extent.width > 0, extent.height > 0 else { return source }
+        guard !extent.isInfinite, !extent.isNull,
+              extent.origin.x.isFinite, extent.origin.y.isFinite,
+              extent.width.isFinite, extent.height.isFinite,
+              extent.width > 0, extent.height > 0 else { return source }
         let layers = preparedLayers(for: extent)
         let displaced = source.clampedToExtent().applyingFilter("CIDisplacementDistortion", parameters: [
             "inputDisplacementImage": layers.displacement,

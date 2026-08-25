@@ -71,6 +71,14 @@ final class MetadataRendererTests: XCTestCase {
                              0x69, 0x73, 0x6f, 0x6d, 0, 0, 0, 0]))
     }
 
+    func testInfiniteExtentIsRejectedWithoutBuildingCacheKey() {
+        let renderer = GlassRenderer(metadata: WatermarkMetadata())
+        let infiniteImage = CIImage(color: .black)
+        XCTAssertTrue(infiniteImage.extent.isInfinite)
+        let result = renderer.render(infiniteImage)
+        XCTAssertTrue(result.extent.isInfinite)
+    }
+
     private func makeFixture(includeMetadata: Bool) throws -> URL {
         let width = 1600
         let height = 1000
