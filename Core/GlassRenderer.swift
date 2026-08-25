@@ -83,19 +83,25 @@ final class GlassRenderer: @unchecked Sendable {
             UIColor.black.setFill()
             ctx.fill(rect)
             let horizontal = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-                UIColor(red: 0.30, green: 0, blue: 0.25, alpha: 1).cgColor,
+                UIColor(red: 0.18, green: 0, blue: 0.25, alpha: 1).cgColor,
+                UIColor(red: 0.34, green: 0, blue: 0.25, alpha: 1).cgColor,
                 UIColor(red: 0.50, green: 0, blue: 0.25, alpha: 1).cgColor,
-                UIColor(red: 0.70, green: 0, blue: 0.25, alpha: 1).cgColor
-            ] as CFArray, locations: [0, 0.5, 1])!
+                UIColor(red: 0.50, green: 0, blue: 0.25, alpha: 1).cgColor,
+                UIColor(red: 0.66, green: 0, blue: 0.25, alpha: 1).cgColor,
+                UIColor(red: 0.82, green: 0, blue: 0.25, alpha: 1).cgColor
+            ] as CFArray, locations: [0, 0.035, 0.08, 0.92, 0.965, 1])!
             ctx.drawLinearGradient(horizontal,
                 start: CGPoint(x: rect.minX, y: rect.midY),
                 end: CGPoint(x: rect.maxX, y: rect.midY), options: [])
             ctx.setBlendMode(.plusLighter)
             let vertical = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-                UIColor(red: 0, green: 0.30, blue: 0.25, alpha: 1).cgColor,
+                UIColor(red: 0, green: 0.18, blue: 0.25, alpha: 1).cgColor,
+                UIColor(red: 0, green: 0.34, blue: 0.25, alpha: 1).cgColor,
                 UIColor(red: 0, green: 0.50, blue: 0.25, alpha: 1).cgColor,
-                UIColor(red: 0, green: 0.70, blue: 0.25, alpha: 1).cgColor
-            ] as CFArray, locations: [0, 0.5, 1])!
+                UIColor(red: 0, green: 0.50, blue: 0.25, alpha: 1).cgColor,
+                UIColor(red: 0, green: 0.66, blue: 0.25, alpha: 1).cgColor,
+                UIColor(red: 0, green: 0.82, blue: 0.25, alpha: 1).cgColor
+            ] as CFArray, locations: [0, 0.18, 0.36, 0.64, 0.82, 1])!
             ctx.drawLinearGradient(vertical,
                 start: CGPoint(x: rect.midX, y: rect.minY),
                 end: CGPoint(x: rect.midX, y: rect.maxY), options: [])
