@@ -108,9 +108,9 @@ final class GlassRenderer: @unchecked Sendable {
             ctx.saveGState()
             path.addClip()
             let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-                UIColor.white.withAlphaComponent(0.16).cgColor,
-                UIColor.white.withAlphaComponent(0.018).cgColor,
-                UIColor.black.withAlphaComponent(0.075).cgColor
+                UIColor.white.withAlphaComponent(0.10).cgColor,
+                UIColor.white.withAlphaComponent(0.008).cgColor,
+                UIColor.black.withAlphaComponent(0.035).cgColor
             ] as CFArray, locations: [0, 0.52, 1])!
             ctx.drawLinearGradient(gradient,
                 start: CGPoint(x: rect.midX, y: rect.minY),
@@ -172,7 +172,7 @@ final class GlassRenderer: @unchecked Sendable {
         }
 
         return Layers(extent: extent, mask: mask, displacement: displacement,
-                      overlay: overlay, displacementScale: height * 0.34)
+                      overlay: overlay, displacementScale: height * 0.56)
     }
 
     private func raster(size: CGSize, opaque: Bool,
