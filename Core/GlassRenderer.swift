@@ -185,6 +185,7 @@ final class GlassRenderer: @unchecked Sendable {
             draw(metadata.location, at: CGPoint(x: rightX, y: rect.minY + height * 0.56),
                  size: locationSize, weight: .regular, alpha: 0.9)
         }
+        let overlay = overlayPanel.transformed(by: placement)
 
         return Layers(extent: extent, mask: mask, displacement: displacement,
                       overlay: overlay, displacementScale: height * 0.56)
@@ -197,9 +198,7 @@ final class GlassRenderer: @unchecked Sendable {
         format.opaque = opaque
         let image = UIGraphicsImageRenderer(size: size, format: format).image(actions: drawing)
         return CIImage(image: image)?.cropped(to: CGRect(origin: .zero, size: size)) ?? .empty()
-            }
-        }
-        let overlay = overlayPanel.transformed(by: placement)
+    }
 
 private func draw(_ text: String, at point: CGPoint, size: CGFloat,
                   weight: UIFont.Weight, alpha: CGFloat = 1) {
@@ -227,5 +226,6 @@ private func fittedFontSize(_ text: String, base: CGFloat, minimum: CGFloat,
     let width = textWidth(text, size: base, weight: weight)
     guard width > maxWidth, width > 0 else { return base }
     return max(minimum, base * maxWidth / width)
+}
 }
 
