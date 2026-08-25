@@ -19,7 +19,7 @@ final class GlassRenderer: @unchecked Sendable {
     }
 
     private let metadata: WatermarkMetadata
-    private let context = CIContext(options: [.cacheIntermediates: true, .useSoftwareRenderer: false])
+    private let context = CIContext(options: [.cacheIntermediates: false, .useSoftwareRenderer: false])
     private let lock = NSLock()
     private var cache: [Key: Layers] = [:]
 
@@ -67,16 +67,20 @@ final class GlassRenderer: @unchecked Sendable {
         let rect = CGRect(x: margin, y: extent.height - margin - height,
                           width: extent.width - margin * 2, height: height)
         let radius = height * 0.47
+        let panelRect = CGRect(origin: .zero, size: rect.size)
+        let placement = CGAffineTransform(translationX: rect.minX, y: rect.minY)
 
-        let mask = raster(size: extent.size, opaque: false) { _ in
+        let maskPanel = raster(size: panelRect.size, opaque: false) { _ in
             UIColor.white.setFill()
-            UIBezierPath(roundedRect: rect, cornerRadius: radius).fill()
+            UIBezierPath(roundedRect: panelRect, cornerRadius: radius).fill()
         }
+        let mask = maskPanel.transformed(by: placement)
 
-        let displacement = raster(size: extent.size, opaque: true) { renderer in
+        let displacementPanel = raster(size: panelRect.size, opaque: true) { renderer in
+            let rect = panelRect
             let ctx = renderer.cgContext
             UIColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 1).setFill()
-            ctx.fill(CGRect(origin: .zero, size: extent.size))
+            ctx.fill(panelRect)
             let path = UIBezierPath(roundedRect: rect, cornerRadius: radius)
             ctx.saveGState()
             path.addClip()
@@ -107,8 +111,13 @@ final class GlassRenderer: @unchecked Sendable {
                 end: CGPoint(x: rect.midX, y: rect.maxY), options: [])
             ctx.restoreGState()
         }
+        let neutralDisplacement = CIImage(color: CIColor(red: 0.5, green: 0.5, blue: 0.5))
+            .cropped(to: extent)
+        let displacement = displacementPanel.transformed(by: placement)
+            .composited(over: neutralDisplacement)
 
-        let overlay = raster(size: extent.size, opaque: false) { [metadata] renderer in
+        let overlayPanel = raster(size: panelRect.size, opaque: false) { [metadata] renderer in
+            let rect = panelRect
             let ctx = renderer.cgContext
             let path = UIBezierPath(roundedRect: rect, cornerRadius: radius)
             ctx.saveGState()
@@ -188,8 +197,9 @@ final class GlassRenderer: @unchecked Sendable {
         format.opaque = opaque
         let image = UIGraphicsImageRenderer(size: size, format: format).image(actions: drawing)
         return CIImage(image: image)?.cropped(to: CGRect(origin: .zero, size: size)) ?? .empty()
-    }
-}
+            }
+        }
+        let overlay = overlayPanel.transformed(by: placement)
 
 private func draw(_ text: String, at point: CGPoint, size: CGFloat,
                   weight: UIFont.Weight, alpha: CGFloat = 1) {
