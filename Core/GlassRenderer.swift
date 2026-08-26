@@ -17,6 +17,9 @@ final class GlassRenderer: @unchecked Sendable {
         let overlay: CIImage
         let displacementScale: CGFloat
         let blurRadius: CGFloat
+        let lensPoint0: CGPoint
+        let lensPoint1: CGPoint
+        let lensRadius: CGFloat
     }
 
     private let metadata: WatermarkMetadata
@@ -36,7 +39,13 @@ final class GlassRenderer: @unchecked Sendable {
         let opticalSource = source.clampedToExtent().applyingFilter("CIGaussianBlur", parameters: [
             kCIInputRadiusKey: layers.blurRadius
         ])
-        let displaced = opticalSource.applyingFilter("CIDisplacementDistortion", parameters: [
+        let refracted = opticalSource.applyingFilter("CIGlassLozenge", parameters: [
+            "inputPoint0": CIVector(cgPoint: layers.lensPoint0),
+            "inputPoint1": CIVector(cgPoint: layers.lensPoint1),
+            "inputRadius": layers.lensRadius,
+            "inputRefraction": 1.34
+        ])
+        let displaced = refracted.applyingFilter("CIDisplacementDistortion", parameters: [
             "inputDisplacementImage": layers.displacement,
             kCIInputScaleKey: layers.displacementScale
         ]).cropped(to: extent)
@@ -72,7 +81,7 @@ final class GlassRenderer: @unchecked Sendable {
         let margin = max(shortSide * 0.012, 8 * scale)
         let height = shortSide * 0.108
         // Core Image uses a bottom-left origin. Keep the capsule at the visual bottom.
-        let rect = CGRect(x: margin, y: margin,
+        let rect = CGRect(x: extent.minX + margin, y: extent.minY + margin,
                           width: extent.width - margin * 2, height: height)
         let radius = height * 0.47
         let panelRect = CGRect(origin: .zero, size: rect.size)
@@ -229,8 +238,11 @@ final class GlassRenderer: @unchecked Sendable {
         let overlay = overlayPanel.transformed(by: placement)
 
         return Layers(extent: extent, mask: mask, displacement: displacement,
-                      overlay: overlay, displacementScale: height * 0.82,
-                      blurRadius: max(height * 0.016, 0.8))
+                      overlay: overlay, displacementScale: height * 0.30,
+                      blurRadius: max(height * 0.003, 0.22),
+                      lensPoint0: CGPoint(x: rect.minX + radius, y: rect.midY),
+                      lensPoint1: CGPoint(x: rect.maxX - radius, y: rect.midY),
+                      lensRadius: radius * 0.96)
     }
 
     private func raster(size: CGSize, opaque: Bool,

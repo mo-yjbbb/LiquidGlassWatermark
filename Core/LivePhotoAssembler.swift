@@ -105,6 +105,18 @@ final class LivePhotoAssembler: Sendable {
             properties = own
         }
 
+        // The rendered pixels are already upright and may have been scaled.
+        // Preserve capture metadata while removing geometry fields that would
+        // rotate the output again or describe the original dimensions.
+        properties[kCGImagePropertyOrientation] = 1
+        properties.removeValue(forKey: kCGImagePropertyPixelWidth)
+        properties.removeValue(forKey: kCGImagePropertyPixelHeight)
+        if var exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any] {
+            exif.removeValue(forKey: kCGImagePropertyExifPixelXDimension)
+            exif.removeValue(forKey: kCGImagePropertyExifPixelYDimension)
+            properties[kCGImagePropertyExifDictionary] = exif
+        }
+
         // Merge the pairing identifier into MakerApple (preserving any
         // existing MakerApple entries).
         var makerApple = properties[kCGImagePropertyMakerAppleDictionary] as? [String: Any] ?? [:]
@@ -336,3 +348,4 @@ final class LivePhotoAssembler: Sendable {
         return AVAssetWriterInputMetadataAdaptor(assetWriterInput: input)
     }
 }
+

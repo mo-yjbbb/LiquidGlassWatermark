@@ -34,7 +34,7 @@ enum LivePhotoProcessor {
             progress(0.12 + $0 * 0.68)
         }
         let assembled = try await LivePhotoAssembler().makePair(
-            photoURL: renderedPhoto, metadataSourceURL: nil,
+            photoURL: renderedPhoto, metadataSourceURL: sourcePhoto,
             videoURL: renderedVideo, in: work
         )
         progress(0.88)
