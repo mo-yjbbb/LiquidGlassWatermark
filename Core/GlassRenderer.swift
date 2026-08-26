@@ -189,7 +189,7 @@ final class GlassRenderer: @unchecked Sendable {
             draw(metadata.date, at: CGPoint(x: leftX, y: line2),
                  size: dateSize, weight: .regular, alpha: 0.9)
 
-            let rightTextMaxWidth = rect.width * 0.255
+            let rightTextMaxWidth = rect.width * 0.245
             let parameterSize = fittedFontSize(metadata.exposure, base: height * 0.18,
                                                minimum: height * 0.125,
                                                maxWidth: rightTextMaxWidth, weight: .medium)
@@ -199,15 +199,25 @@ final class GlassRenderer: @unchecked Sendable {
             let rightTextWidth = max(textWidth(metadata.exposure, size: parameterSize, weight: .medium),
                                      textWidth(metadata.location, size: locationSize, weight: .regular))
             let rightX = rect.maxX - horizontalPadding - rightTextWidth
-            let logoSize = height * 0.47
+            let separatorX = rightX - height * 0.18
+            let logoSize = height * 0.54
             let logoWidth = textWidth("", size: logoSize, weight: .medium)
-            let logoX = rightX - height * 0.20 - logoWidth
+            let logoX = separatorX - height * 0.16 - logoWidth
             let logoHeight = UIFont.systemFont(ofSize: logoSize, weight: .medium).lineHeight
             draw("", at: CGPoint(x: logoX, y: rect.midY - logoHeight * 0.5),
                  size: logoSize, weight: .medium)
-            draw(metadata.exposure, at: CGPoint(x: rightX, y: rect.minY + height * 0.19),
+
+            ctx.saveGState()
+            ctx.setStrokeColor(UIColor.white.withAlphaComponent(0.62).cgColor)
+            ctx.setLineWidth(max(scale * 1.05, 0.8))
+            ctx.move(to: CGPoint(x: separatorX, y: rect.minY + height * 0.23))
+            ctx.addLine(to: CGPoint(x: separatorX, y: rect.maxY - height * 0.23))
+            ctx.strokePath()
+            ctx.restoreGState()
+
+            draw(metadata.exposure, at: CGPoint(x: rightX, y: rect.minY + height * 0.22),
                  size: parameterSize, weight: .medium)
-            draw(metadata.location, at: CGPoint(x: rightX, y: rect.minY + height * 0.56),
+            draw(metadata.location, at: CGPoint(x: rightX, y: rect.minY + height * 0.52),
                  size: locationSize, weight: .regular, alpha: 0.9)
         }
         let overlay = overlayPanel.transformed(by: placement)

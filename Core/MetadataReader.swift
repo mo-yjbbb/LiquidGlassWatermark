@@ -45,7 +45,11 @@ enum MetadataReader {
             let make = (tiff[kCGImagePropertyTIFFMake] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
             let model = (tiff[kCGImagePropertyTIFFModel] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
             if let model, !model.isEmpty {
-                if let make, !make.isEmpty,
+                if model.lowercased().hasPrefix("apple ") {
+                    value.device = String(model.dropFirst("Apple ".count))
+                } else if let make, make.caseInsensitiveCompare("Apple") == .orderedSame {
+                    value.device = model
+                } else if let make, !make.isEmpty,
                    !model.lowercased().hasPrefix(make.lowercased()) {
                     value.device = "\(make) \(model)"
                 } else {
