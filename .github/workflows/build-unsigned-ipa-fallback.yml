@@ -1,0 +1,86 @@
+name: Build unsigned IPA fallback
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 26
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.3.app/Contents/Developer
+          xcodebuild -version
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Run metadata and renderer simulation tests
+        run: |
+          set -euo pipefail
+          rm -rf TestResults.xcresult TestAttachments
+          xcodebuild test -project LiquidGlassWatermark.xcodeproj -scheme LiquidGlassWatermark -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=latest' -resultBundlePath TestResults.xcresult CODE_SIGNING_ALLOWED=NO
+          xcrun xcresulttool export attachments --path TestResults.xcresult --output-path TestAttachments
+      - name: Build without signing
+        run: |
+          xcodebuild \
+            -project LiquidGlassWatermark.xcodeproj \
+            -scheme LiquidGlassWatermark \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            clean build
+      - name: Package signer-compatible IPAs
+        run: |
+          set -euo pipefail
+          APP="build/Build/Products/Release-iphoneos/LiquidGlassWatermark.app"
+          test -f "$APP/LiquidGlassWatermark"
+          /usr/bin/file "$APP/LiquidGlassWatermark" | grep -q "Mach-O 64-bit executable arm64"
+          EXECUTABLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")
+          BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
+          test "$EXECUTABLE" = "LiquidGlassWatermark"
+          test "$BUNDLE_ID" = "com.localwatermark.liquidglass"
+          test -x "$APP/$EXECUTABLE"
+          test -f "$APP/Assets.car"
+          ICON_NAME=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName' "$APP/Info.plist")
+          test "$ICON_NAME" = "AppIcon"
+          rm -rf package-clean package-adhoc verify
+          mkdir -p package-clean/Payload package-adhoc/Payload verify
+          cp -R "$APP" package-clean/Payload/
+          cp -R "$APP" package-adhoc/Payload/
+
+          xattr -cr package-clean/Payload/LiquidGlassWatermark.app || true
+          rm -rf package-clean/Payload/LiquidGlassWatermark.app/_CodeSignature
+          rm -f package-clean/Payload/LiquidGlassWatermark.app/embedded.mobileprovision
+
+          xattr -cr package-adhoc/Payload/LiquidGlassWatermark.app || true
+          rm -rf package-adhoc/Payload/LiquidGlassWatermark.app/_CodeSignature
+          rm -f package-adhoc/Payload/LiquidGlassWatermark.app/embedded.mobileprovision
+          codesign --force --sign - package-adhoc/Payload/LiquidGlassWatermark.app
+          codesign --verify --strict package-adhoc/Payload/LiquidGlassWatermark.app
+
+          (cd package-clean && /usr/bin/zip -qry -X ../LiquidGlassWatermark-clean.ipa Payload)
+          (cd package-adhoc && /usr/bin/zip -qry -X ../LiquidGlassWatermark-adhoc.ipa Payload)
+
+          for IPA in LiquidGlassWatermark-clean.ipa LiquidGlassWatermark-adhoc.ipa; do
+            unzip -q "$IPA" -d "verify/${IPA%.ipa}"
+            test -f "verify/${IPA%.ipa}/Payload/LiquidGlassWatermark.app/LiquidGlassWatermark"
+            if unzip -Z1 "$IPA" | grep -Eq '(^__MACOSX/|\.DS_Store$|/\._)'; then
+              echo "Unexpected macOS metadata in $IPA" >&2
+              exit 1
+            fi
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LiquidGlassWatermark-signer-compatible
+          path: |
+            LiquidGlassWatermark-clean.ipa
+            LiquidGlassWatermark-adhoc.ipa
+            TestAttachments
+
