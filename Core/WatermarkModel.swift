@@ -18,11 +18,19 @@ final class WatermarkModel: ObservableObject {
         defer { try? FileManager.default.removeItem(at: selection.imageURL) }
 
         do {
-            let authorized = await PhotoAccess.request(readWrite: selection.isLivePhoto)
+            // Resolve the real PHAsset only after authorization. Classifying in
+            // PHPicker's callback can incorrectly turn a Live Photo into a
+            // still when the library was not readable yet.
+            let authorized = await PhotoAccess.request(readWrite: true)
             guard authorized else { throw WatermarkError.photoPermissionDenied }
             let asset = selection.localIdentifier.flatMap {
                 PHAsset.fetchAssets(withLocalIdentifiers: [$0], options: nil).firstObject
             }
+            let resources = asset.map { PHAssetResource.assetResources(for: $0) } ?? []
+            let actualIsLive = selection.isLivePhoto
+                || asset?.mediaSubtypes.contains(.photoLive) == true
+                || resources.contains(where: { $0.type == .pairedVideo || $0.type == .fullSizePairedVideo })
+                || MotionPhotoExtractor.containsEmbeddedVideo(at: selection.imageURL)
             status = "读取真实拍摄参数"
             let metadata = MetadataReader.read(asset: asset, imageURL: selection.imageURL)
             guard !metadata.device.isEmpty, !metadata.exposure.isEmpty,
@@ -30,7 +38,7 @@ final class WatermarkModel: ObservableObject {
                 throw WatermarkError.metadataUnavailable
             }
 
-            if selection.isLivePhoto {
+            if actualIsLive {
                 status = "重建标准 Live Photo"
                 progress = 0.15
                 try await LivePhotoProcessor.process(asset: asset,
@@ -79,7 +87,9 @@ enum PhotoAccess {
     static func request(readWrite: Bool) async -> Bool {
         let level: PHAccessLevel = readWrite ? .readWrite : .addOnly
         let status = await PHPhotoLibrary.requestAuthorization(for: level)
-        return readWrite ? status == .authorized : (status == .authorized || status == .limited)
+        return readWrite
+            ? (status == .authorized || status == .limited)
+            : (status == .authorized || status == .limited)
     }
 }
 

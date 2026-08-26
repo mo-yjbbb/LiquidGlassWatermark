@@ -39,8 +39,9 @@ enum LivePhotoProcessor {
         )
         progress(0.88)
         try await preflight(photoURL: assembled.photoURL, videoURL: assembled.videoURL)
-        try await save(photoURL: assembled.photoURL, videoURL: assembled.videoURL,
-                       creationDate: asset?.creationDate, location: asset?.location)
+        let identifier = try await save(photoURL: assembled.photoURL, videoURL: assembled.videoURL,
+                                        creationDate: asset?.creationDate, location: asset?.location)
+        try await verifySavedLivePhoto(localIdentifier: identifier)
         progress(1)
     }
 
@@ -123,14 +124,32 @@ enum LivePhotoProcessor {
     }
 
     private static func save(photoURL: URL, videoURL: URL, creationDate: Date?,
-                             location: CLLocation?) async throws {
+                             location: CLLocation?) async throws -> String {
+        var localIdentifier: String?
         try await PHPhotoLibrary.shared().performChanges {
             let request = PHAssetCreationRequest.forAsset()
             request.addResource(with: .photo, fileURL: photoURL, options: nil)
             request.addResource(with: .pairedVideo, fileURL: videoURL, options: nil)
             request.creationDate = creationDate
             request.location = location
+            localIdentifier = request.placeholderForCreatedAsset?.localIdentifier
         }
+        guard let localIdentifier else { throw WatermarkError.livePhotoValidationFailed }
+        return localIdentifier
+    }
+
+    private static func verifySavedLivePhoto(localIdentifier: String) async throws {
+        for attempt in 0..<12 {
+            let result = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil)
+            if let saved = result.firstObject {
+                let resources = PHAssetResource.assetResources(for: saved)
+                let hasPhoto = resources.contains { $0.type == .photo || $0.type == .fullSizePhoto }
+                let hasVideo = resources.contains { $0.type == .pairedVideo || $0.type == .fullSizePairedVideo }
+                if saved.mediaSubtypes.contains(.photoLive), hasPhoto, hasVideo { return }
+            }
+            if attempt < 11 { try await Task.sleep(for: .milliseconds(400 + attempt * 120)) }
+        }
+        throw WatermarkError.livePhotoValidationFailed
     }
 }
 
