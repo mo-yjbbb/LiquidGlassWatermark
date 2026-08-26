@@ -79,7 +79,17 @@ final class MetadataRendererTests: XCTestCase {
         XCTAssertTrue(result.extent.isInfinite)
     }
 
-    private func makeFixture(includeMetadata: Bool) throws -> URL {
+    func testApplePrefixIsRemovedFromDisplayedModel() throws {
+        let url = try makeFixture(includeMetadata: true,
+                                  make: "Apple", model: "Apple iPhone 17 Pro")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let metadata = MetadataReader.read(asset: nil, imageURL: url)
+        XCTAssertEqual(metadata.device, "iPhone 17 Pro")
+    }
+
+    private func makeFixture(includeMetadata: Bool,
+                             make: String = "Xiaomi",
+                             model: String = "Xiaomi 15 Pro") throws -> URL {
         let width = 1600
         let height = 1000
         let colorSpace = CGColorSpaceCreateDeviceRGB()
@@ -113,8 +123,8 @@ final class MetadataRendererTests: XCTestCase {
         var properties: [CFString: Any] = [:]
         if includeMetadata {
             properties[kCGImagePropertyTIFFDictionary] = [
-                kCGImagePropertyTIFFMake: "Xiaomi",
-                kCGImagePropertyTIFFModel: "Xiaomi 15 Pro"
+                kCGImagePropertyTIFFMake: make,
+                kCGImagePropertyTIFFModel: model
             ]
             properties[kCGImagePropertyExifDictionary] = [
                 kCGImagePropertyExifDateTimeOriginal: "2026:08:24 16:15:01",
