@@ -43,7 +43,7 @@ final class GlassRenderer: @unchecked Sendable {
             "inputPoint0": CIVector(cgPoint: layers.lensPoint0),
             "inputPoint1": CIVector(cgPoint: layers.lensPoint1),
             "inputRadius": layers.lensRadius,
-            "inputRefraction": 1.34
+            "inputRefraction": 1.18
         ])
         let displaced = refracted.applyingFilter("CIDisplacementDistortion", parameters: [
             "inputDisplacementImage": layers.displacement,
@@ -238,7 +238,7 @@ final class GlassRenderer: @unchecked Sendable {
         let overlay = overlayPanel.transformed(by: placement)
 
         return Layers(extent: extent, mask: mask, displacement: displacement,
-                      overlay: overlay, displacementScale: height * 0.30,
+                      overlay: overlay, displacementScale: height * 0.18,
                       blurRadius: max(height * 0.003, 0.22),
                       lensPoint0: CGPoint(x: rect.minX + radius, y: rect.midY),
                       lensPoint1: CGPoint(x: rect.maxX - radius, y: rect.midY),
