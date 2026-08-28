@@ -261,18 +261,11 @@ final class GlassRenderer: @unchecked Sendable {
             let groupMinY = rect.midY - groupHeight * 0.5
             let groupMaxY = groupMinY + groupHeight
             let brand = brandMark(for: metadata.device)
-            let logoLineHeightRatio = UIFont.systemFont(ofSize: 100, weight: brand.weight).lineHeight / 100
-            let idealLogoSize = groupHeight / logoLineHeightRatio
-            let logoSize = fittedFontSize(brand.text, base: idealLogoSize,
-                                          minimum: idealLogoSize * 0.46,
-                                          maxWidth: height * 1.18,
-                                          weight: brand.weight)
-            let logoWidth = textWidth(brand.text, size: logoSize, weight: brand.weight)
+            let logoWidth = min(groupHeight * brandAspectRatio(brand), height * 1.55)
             let logoX = separatorX - height * 0.16 - logoWidth
-            let logoLineHeight = UIFont.systemFont(ofSize: logoSize, weight: brand.weight).lineHeight
-            draw(brand.text,
-                 at: CGPoint(x: logoX, y: rect.midY - logoLineHeight * 0.5),
-                 size: logoSize, weight: brand.weight)
+            drawBrandMark(brand, in: CGRect(x: logoX, y: groupMinY,
+                                            width: logoWidth, height: groupHeight),
+                          context: ctx)
 
             ctx.saveGState()
             ctx.setStrokeColor(UIColor.white.withAlphaComponent(0.62).cgColor)
@@ -334,31 +327,145 @@ private func fittedFontSize(_ text: String, base: CGFloat, minimum: CGFloat,
     return max(minimum, base * maxWidth / width)
 }
 
-private func brandMark(for device: String) -> (text: String, weight: UIFont.Weight) {
+private enum BrandMark {
+    case apple, leica, xmage, hasselblad, zeiss, iqoo, honor
+    case word(String, UIFont.Weight)
+    case camera
+}
+
+private func brandMark(for device: String) -> BrandMark {
     let value = device.lowercased()
-    if value.contains("iphone") || value.contains("apple") { return ("", .medium) }
+    if value.contains("iphone") || value.contains("apple") { return .apple }
     // Prefer the imaging partner used by the phone family. When no known
     // partnership exists, fall back to the device maker's own word mark.
     if value.contains("xiaomi") || value.contains("redmi") || value.contains("poco") {
-        return ("Leica", .semibold)
+        return .leica
     }
-    if value.contains("huawei") { return ("XMAGE", .bold) }
-    if value.contains("honor") { return ("HONOR", .semibold) }
+    if value.contains("huawei") { return .xmage }
+    if value.contains("honor") { return .honor }
     if value.contains("oneplus") || value.contains("one plus") || value.contains("oppo") {
-        return ("HASSELBLAD", .semibold)
+        return .hasselblad
     }
-    if value.contains("vivo") || value.contains("iqoo") { return ("ZEISS", .bold) }
-    if value.contains("samsung") || value.contains("galaxy") { return ("SAMSUNG", .bold) }
-    if value.contains("google") || value.contains("pixel") { return ("G", .bold) }
-    if value.contains("sony") || value.contains("xperia") { return ("SONY", .semibold) }
-    if value.contains("realme") { return ("realme", .bold) }
-    if value.contains("motorola") || value.hasPrefix("moto") { return ("M", .bold) }
-    if value.contains("nubia") || value.contains("redmagic") { return ("nubia", .semibold) }
-    if value.contains("leica") { return ("Leica", .semibold) }
-    if value.contains("nikon") { return ("Nikon", .bold) }
-    if value.contains("canon") { return ("Canon", .bold) }
-    if value.contains("fujifilm") || value.contains("fuji") { return ("FUJI", .bold) }
-    return ("◉", .semibold)
+    if value.contains("iqoo") { return .iqoo }
+    if value.contains("vivo") { return .zeiss }
+    if value.contains("samsung") || value.contains("galaxy") { return .word("SAMSUNG", .bold) }
+    if value.contains("google") || value.contains("pixel") { return .word("G", .bold) }
+    if value.contains("sony") || value.contains("xperia") { return .word("SONY", .semibold) }
+    if value.contains("realme") { return .word("realme", .bold) }
+    if value.contains("motorola") || value.hasPrefix("moto") { return .word("M", .bold) }
+    if value.contains("nubia") || value.contains("redmagic") { return .word("nubia", .semibold) }
+    if value.contains("leica") { return .leica }
+    if value.contains("nikon") { return .word("Nikon", .bold) }
+    if value.contains("canon") { return .word("Canon", .bold) }
+    if value.contains("fujifilm") || value.contains("fuji") { return .word("FUJI", .bold) }
+    return .camera
+}
+
+private func brandAspectRatio(_ mark: BrandMark) -> CGFloat {
+    switch mark {
+    case .apple, .leica, .hasselblad, .camera: return 1
+    case .zeiss: return 1.05
+    case .xmage: return 1.9
+    case .iqoo: return 2.05
+    case .honor: return 2.4
+    case .word(let text, _): return max(0.8, min(CGFloat(text.count) * 0.62, 2.5))
+    }
+}
+
+private func drawBrandMark(_ mark: BrandMark, in rect: CGRect, context ctx: CGContext) {
+    ctx.saveGState()
+    defer { ctx.restoreGState() }
+
+    func centeredText(_ text: String, font: UIFont, color: UIColor) {
+        let size = (text as NSString).size(withAttributes: [.font: font])
+        (text as NSString).draw(at: CGPoint(x: rect.midX - size.width * 0.5,
+                                            y: rect.midY - size.height * 0.5),
+                                withAttributes: [.font: font, .foregroundColor: color])
+    }
+
+    switch mark {
+    case .apple:
+        let font = UIFont.systemFont(ofSize: rect.height * 0.83, weight: .medium)
+        centeredText("", font: font, color: .white)
+    case .leica:
+        let circle = CGRect(x: rect.midX - rect.height * 0.48,
+                            y: rect.midY - rect.height * 0.48,
+                            width: rect.height * 0.96, height: rect.height * 0.96)
+        UIColor(red: 0.93, green: 0, blue: 0.08, alpha: 1).setFill()
+        UIBezierPath(ovalIn: circle).fill()
+        let font = UIFont(name: "SnellRoundhand-Bold", size: rect.height * 0.35)
+            ?? UIFont.italicSystemFont(ofSize: rect.height * 0.32)
+        centeredText("Leica", font: font, color: .white)
+    case .xmage:
+        let font = UIFont.systemFont(ofSize: rect.height * 0.53, weight: .bold)
+        centeredText("XMAGE", font: font,
+                     color: UIColor(red: 0.78, green: 0, blue: 0.16, alpha: 1))
+    case .hasselblad:
+        let diameter = min(rect.width, rect.height) * 0.96
+        let badge = CGRect(x: rect.midX - diameter * 0.5, y: rect.midY - diameter * 0.5,
+                           width: diameter, height: diameter)
+        UIColor.black.withAlphaComponent(0.88).setFill()
+        UIBezierPath(ovalIn: badge).fill()
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: badge.minX + badge.width * x, y: badge.minY + badge.height * y)
+        }
+        UIColor.white.setFill()
+        let left = UIBezierPath()
+        left.move(to: point(0.35, 0.22)); left.addLine(to: point(0.49, 0.22))
+        left.addLine(to: point(0.38, 0.80)); left.addLine(to: point(0.24, 0.80)); left.close(); left.fill()
+        let right = UIBezierPath()
+        right.move(to: point(0.61, 0.20)); right.addLine(to: point(0.75, 0.20))
+        right.addLine(to: point(0.64, 0.78)); right.addLine(to: point(0.50, 0.78)); right.close(); right.fill()
+        let bridge = UIBezierPath()
+        bridge.move(to: point(0.27, 0.46)); bridge.addLine(to: point(0.68, 0.46))
+        bridge.addLine(to: point(0.65, 0.59)); bridge.addLine(to: point(0.24, 0.59)); bridge.close(); bridge.fill()
+    case .zeiss:
+        let badge = rect.insetBy(dx: rect.width * 0.04, dy: rect.height * 0.04)
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: badge.minX, y: badge.minY))
+        path.addLine(to: CGPoint(x: badge.maxX, y: badge.minY))
+        path.addLine(to: CGPoint(x: badge.maxX, y: badge.minY + badge.height * 0.96))
+        path.addQuadCurve(to: CGPoint(x: badge.minX, y: badge.minY + badge.height * 0.96),
+                          controlPoint: CGPoint(x: badge.midX, y: badge.minY + badge.height * 0.70))
+        path.close()
+        UIColor(red: 0.10, green: 0.18, blue: 0.62, alpha: 1).setFill()
+        path.fill()
+        centeredText("ZEISS", font: UIFont.systemFont(ofSize: rect.height * 0.34,
+                                                       weight: .bold), color: .white)
+    case .iqoo:
+        centeredText("iQOO", font: UIFont.systemFont(ofSize: rect.height * 0.54,
+                                                      weight: .medium),
+                     color: UIColor(red: 0.96, green: 0.66, blue: 0.02, alpha: 1))
+    case .honor:
+        let iconSize = rect.height * 0.72
+        let icon = CGRect(x: rect.minX, y: rect.midY - iconSize * 0.5,
+                          width: iconSize, height: iconSize)
+        ctx.setStrokeColor(UIColor.white.cgColor)
+        ctx.setLineWidth(max(iconSize * 0.16, 1))
+        ctx.setLineCap(.butt)
+        for start in stride(from: CGFloat.pi * 0.08, to: CGFloat.pi * 2, by: CGFloat.pi * 0.5) {
+            ctx.addArc(center: CGPoint(x: icon.midX, y: icon.midY),
+                       radius: iconSize * 0.36, startAngle: start,
+                       endAngle: start + CGFloat.pi * 0.34, clockwise: false)
+        }
+        ctx.strokePath()
+        let wordRect = CGRect(x: icon.maxX + rect.height * 0.08, y: rect.minY,
+                              width: max(rect.maxX - icon.maxX - rect.height * 0.08, 1),
+                              height: rect.height)
+        let font = UIFont.systemFont(ofSize: rect.height * 0.34, weight: .semibold)
+        let size = ("HONOR" as NSString).size(withAttributes: [.font: font])
+        ("HONOR" as NSString).draw(at: CGPoint(x: wordRect.midX - size.width * 0.5,
+                                               y: wordRect.midY - size.height * 0.5),
+                                    withAttributes: [.font: font, .foregroundColor: UIColor.white])
+    case .word(let text, let weight):
+        let size = fittedFontSize(text, base: rect.height * 0.52,
+                                  minimum: rect.height * 0.27,
+                                  maxWidth: rect.width, weight: weight)
+        centeredText(text, font: UIFont.systemFont(ofSize: size, weight: weight), color: .white)
+    case .camera:
+        centeredText("◉", font: UIFont.systemFont(ofSize: rect.height * 0.62,
+                                                   weight: .semibold), color: .white)
+    }
 }
 }
 
