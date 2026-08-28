@@ -36,9 +36,9 @@ final class GlassRenderer: @unchecked Sendable {
               extent.width.isFinite, extent.height.isFinite,
               extent.width > 0, extent.height > 0 else { return source }
         let layers = preparedLayers(for: extent)
-        let opticalSource = source.clampedToExtent().applyingFilter("CIGaussianBlur", parameters: [
-            kCIInputRadiusKey: layers.blurRadius
-        ])
+        // Keep the interior optically clear. Liquid depth comes from gentle
+        // refraction and reflections, not a frosted/blurred fill.
+        let opticalSource = source.clampedToExtent()
         let refracted = opticalSource.applyingFilter("CIGlassLozenge", parameters: [
             "inputPoint0": CIVector(cgPoint: layers.lensPoint0),
             "inputPoint1": CIVector(cgPoint: layers.lensPoint1),
@@ -137,18 +137,6 @@ final class GlassRenderer: @unchecked Sendable {
             let rect = panelRect
             let ctx = renderer.cgContext
             let path = UIBezierPath(roundedRect: rect, cornerRadius: radius)
-            ctx.saveGState()
-            path.addClip()
-            let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-                UIColor.white.withAlphaComponent(0.026).cgColor,
-                UIColor.white.withAlphaComponent(0.004).cgColor,
-                UIColor.black.withAlphaComponent(0.008).cgColor
-            ] as CFArray, locations: [0, 0.52, 1])!
-            ctx.drawLinearGradient(gradient,
-                start: CGPoint(x: rect.midX, y: rect.minY),
-                end: CGPoint(x: rect.midX, y: rect.maxY), options: [])
-            ctx.restoreGState()
-
             // Broad diagonal reflections make the surface read as a curved
             // lens instead of a uniformly transparent rectangle.
             ctx.saveGState()
@@ -246,7 +234,7 @@ final class GlassRenderer: @unchecked Sendable {
 
         return Layers(extent: extent, mask: mask, displacement: displacement,
                       overlay: overlay, displacementScale: height * 0.105,
-                      blurRadius: max(height * 0.0012, 0.10),
+                      blurRadius: 0,
                       lensPoint0: CGPoint(x: rect.minX + radius, y: rect.midY),
                       lensPoint1: CGPoint(x: rect.maxX - radius, y: rect.midY),
                       lensRadius: radius * 0.985)
