@@ -9,6 +9,8 @@ iOS 26 本地照片/Live Photo 水印工具。所有图像处理均在设备上�
 - 自动读取拍摄时间、设备型号、焦距、光圈、快门、ISO 和位置（元数据存在时）。
 - 输出保留原图 EXIF、TIFF、GPS 等拍摄元数据，仅重置已经烘焙到像素中的方向和尺寸字段。
 - 提供“添加液态玻璃水印”App Shortcut，可在系统快捷指令中直接调用。
+- 提供系统分享扩展：可在“照片 → 分享”中直接选择“液态玻璃水印”；
+  对 Live Photo 同时接收静态资源与配对视频，不按普通图片降级。
 - 原 Live Photo 不修改，结果保存为新的照片图库资源。
 
 ## 生成未签名 IPA
@@ -33,4 +35,3 @@ open LiquidGlassWatermark.xcodeproj
 ```
 
 在 Xcode 中选择自己的 Team，并将 Bundle Identifier 改成个人唯一值后运行。
-

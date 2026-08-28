@@ -45,6 +45,39 @@ enum LivePhotoProcessor {
         progress(1)
     }
 
+    /// Entry point used by the Photos share extension. The extension receives
+    /// the still and paired movie from the share sheet, so it must never route
+    /// the item through the single-image/motion-photo fallback.
+    static func process(sharedPhotoURL: URL, pairedVideoURL: URL,
+                        metadata: WatermarkMetadata,
+                        creationDate: Date? = nil, location: CLLocation? = nil,
+                        progress: @escaping @Sendable (Double) -> Void) async throws {
+        let work = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LGW-Share-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: work) }
+
+        let renderedPhoto = work.appendingPathComponent("rendered.jpg")
+        let renderedVideo = work.appendingPathComponent("rendered.mov")
+        let renderer = GlassRenderer(metadata: metadata)
+        try renderStill(sharedPhotoURL, to: renderedPhoto, renderer: renderer)
+        progress(0.12)
+        try await renderVideo(pairedVideoURL, to: renderedVideo, renderer: renderer) {
+            progress(0.12 + $0 * 0.68)
+        }
+        let assembled = try await LivePhotoAssembler().makePair(
+            photoURL: renderedPhoto, metadataSourceURL: sharedPhotoURL,
+            videoURL: renderedVideo, in: work
+        )
+        progress(0.88)
+        try await preflight(photoURL: assembled.photoURL, videoURL: assembled.videoURL)
+        let identifier = try await save(photoURL: assembled.photoURL,
+                                        videoURL: assembled.videoURL,
+                                        creationDate: creationDate, location: location)
+        try await verifySavedLivePhoto(localIdentifier: identifier)
+        progress(1)
+    }
+
     private static func matchedResources(for asset: PHAsset) throws
         -> (photo: PHAssetResource, video: PHAssetResource) {
         let resources = PHAssetResource.assetResources(for: asset)
@@ -152,4 +185,3 @@ enum LivePhotoProcessor {
         throw WatermarkError.livePhotoValidationFailed
     }
 }
-

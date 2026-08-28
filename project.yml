@@ -27,10 +27,26 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MACCATALYST: NO
+    dependencies:
+      - target: LiquidGlassWatermarkShare
     scheme:
       gatherCoverageData: false
       testTargets:
         - LiquidGlassWatermarkTests
+  LiquidGlassWatermarkShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - ShareExtension
+      - Core
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.localwatermark.liquidglass.share
+        PRODUCT_NAME: LiquidGlassWatermarkShare
+        INFOPLIST_FILE: ShareExtension/Info.plist
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: NO
+        APPLICATION_EXTENSION_API_ONLY: YES
   LiquidGlassWatermarkTests:
     type: bundle.unit-test
     platform: iOS
@@ -41,4 +57,3 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-

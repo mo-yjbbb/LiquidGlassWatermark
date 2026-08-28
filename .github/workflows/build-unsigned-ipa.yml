@@ -48,6 +48,9 @@ jobs:
           test "$BUNDLE_ID" = "com.localwatermark.liquidglass"
           test -x "$APP/$EXECUTABLE"
           test -f "$APP/Assets.car"
+          EXTENSION="$APP/PlugIns/LiquidGlassWatermarkShare.appex"
+          test -f "$EXTENSION/LiquidGlassWatermarkShare"
+          /usr/bin/file "$EXTENSION/LiquidGlassWatermarkShare" | grep -q "Mach-O 64-bit executable arm64"
           ICON_NAME=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName' "$APP/Info.plist")
           test "$ICON_NAME" = "AppIcon"
           rm -rf package-clean package-adhoc verify
@@ -62,7 +65,11 @@ jobs:
           xattr -cr package-adhoc/Payload/LiquidGlassWatermark.app || true
           rm -rf package-adhoc/Payload/LiquidGlassWatermark.app/_CodeSignature
           rm -f package-adhoc/Payload/LiquidGlassWatermark.app/embedded.mobileprovision
+          rm -rf package-adhoc/Payload/LiquidGlassWatermark.app/PlugIns/LiquidGlassWatermarkShare.appex/_CodeSignature
+          rm -f package-adhoc/Payload/LiquidGlassWatermark.app/PlugIns/LiquidGlassWatermarkShare.appex/embedded.mobileprovision
+          codesign --force --sign - package-adhoc/Payload/LiquidGlassWatermark.app/PlugIns/LiquidGlassWatermarkShare.appex
           codesign --force --sign - package-adhoc/Payload/LiquidGlassWatermark.app
+          codesign --verify --strict package-adhoc/Payload/LiquidGlassWatermark.app/PlugIns/LiquidGlassWatermarkShare.appex
           codesign --verify --strict package-adhoc/Payload/LiquidGlassWatermark.app
 
           (cd package-clean && /usr/bin/zip -qry -X ../LiquidGlassWatermark-clean.ipa Payload)
@@ -71,6 +78,7 @@ jobs:
           for IPA in LiquidGlassWatermark-clean.ipa LiquidGlassWatermark-adhoc.ipa; do
             unzip -q "$IPA" -d "verify/${IPA%.ipa}"
             test -f "verify/${IPA%.ipa}/Payload/LiquidGlassWatermark.app/LiquidGlassWatermark"
+            test -f "verify/${IPA%.ipa}/Payload/LiquidGlassWatermark.app/PlugIns/LiquidGlassWatermarkShare.appex/LiquidGlassWatermarkShare"
             if unzip -Z1 "$IPA" | grep -Eq '(^__MACOSX/|\.DS_Store$|/\._)'; then
               echo "Unexpected macOS metadata in $IPA" >&2
               exit 1
@@ -83,4 +91,3 @@ jobs:
             LiquidGlassWatermark-clean.ipa
             LiquidGlassWatermark-adhoc.ipa
             TestAttachments
-
