@@ -33,7 +33,8 @@ enum LivePhotoProcessor {
         try renderStill(sourcePhoto, to: renderedPhoto, renderer: renderer,
                         maxDimension: maxStillDimension)
         progress(0.12)
-        try await renderVideo(sourceVideo, to: renderedVideo, renderer: renderer) {
+        try await renderVideo(sourceVideo, to: renderedVideo, renderer: renderer,
+                              maxWorkingDimension: maxStillDimension) {
             progress(0.12 + $0 * 0.68)
         }
         let assembled = try await LivePhotoAssembler().makePair(
@@ -69,7 +70,8 @@ enum LivePhotoProcessor {
         try renderStill(sharedPhotoURL, to: renderedPhoto, renderer: renderer,
                         maxDimension: maxStillDimension)
         progress(0.12)
-        try await renderVideo(pairedVideoURL, to: renderedVideo, renderer: renderer) {
+        try await renderVideo(pairedVideoURL, to: renderedVideo, renderer: renderer,
+                              maxWorkingDimension: min(maxStillDimension, 1600)) {
             progress(0.12 + $0 * 0.68)
         }
         let assembled = try await LivePhotoAssembler().makePair(
@@ -119,18 +121,31 @@ enum LivePhotoProcessor {
 
     private static func renderVideo(_ sourceURL: URL, to outputURL: URL,
                                     renderer: GlassRenderer,
+                                    maxWorkingDimension: CGFloat,
                                     progress: @escaping @Sendable (Double) -> Void) async throws {
         let asset = AVURLAsset(url: sourceURL)
         guard let session = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetHighestQuality) else {
             throw WatermarkError.renderFailed
         }
         let composition = AVVideoComposition(asset: asset) { request in
-            // request.sourceImage has the finite frame extent required by the
-            // renderer. clampedToExtent() is intentionally not used here: it
-            // creates an infinite CIImage and traps when the renderer builds
-            // its integer cache key.
-            request.finish(with: renderer.render(request.sourceImage)
-                .cropped(to: request.sourceImage.extent), context: nil)
+            autoreleasepool {
+                // Share extensions have a much smaller memory allowance than
+                // the host app. Work on a bounded frame, then scale the result
+                // back to the composition extent so the Live Photo retains its
+                // original geometry and never silently becomes a still image.
+                let original = request.sourceImage
+                let longest = max(original.extent.width, original.extent.height)
+                let scale = min(1, maxWorkingDimension / max(longest, 1))
+                let working = scale < 1
+                    ? original.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+                    : original
+                var rendered = renderer.render(working).cropped(to: working.extent)
+                if scale < 1 {
+                    rendered = rendered.transformed(by: CGAffineTransform(scaleX: 1 / scale,
+                                                                           y: 1 / scale))
+                }
+                request.finish(with: rendered.cropped(to: original.extent), context: nil)
+            }
         }
         try? FileManager.default.removeItem(at: outputURL)
         session.outputURL = outputURL
@@ -194,3 +209,4 @@ enum LivePhotoProcessor {
         throw WatermarkError.livePhotoValidationFailed
     }
 }
+
