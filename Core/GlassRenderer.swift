@@ -482,14 +482,25 @@ private func drawBrandMark(_ mark: BrandMark, in rect: CGRect, context ctx: CGCo
         let iconSize = rect.height * 0.84
         let icon = CGRect(x: rect.midX - iconSize * 0.5, y: rect.midY - iconSize * 0.5,
                           width: iconSize, height: iconSize)
-        ctx.setStrokeColor(UIColor.white.cgColor)
-        ctx.setLineWidth(max(iconSize * 0.16, 1))
-        ctx.setLineCap(.butt)
-        ctx.addArc(center: CGPoint(x: icon.midX, y: icon.midY), radius: iconSize * 0.36,
-                   startAngle: -.pi * 0.14, endAngle: .pi * 0.72, clockwise: false)
-        ctx.addArc(center: CGPoint(x: icon.midX, y: icon.midY), radius: iconSize * 0.36,
-                   startAngle: .pi * 0.86, endAngle: .pi * 1.72, clockwise: false)
-        ctx.strokePath()
+        UIColor.white.setFill()
+        UIBezierPath(ovalIn: icon).fill()
+        ctx.setBlendMode(.clear)
+        UIBezierPath(ovalIn: icon.insetBy(dx: iconSize * 0.19,
+                                          dy: iconSize * 0.19)).fill()
+        // One centred diagonal cut produces two exactly opposite, symmetric
+        // notches at the upper-right and lower-left of the ring.
+        let cut = UIBezierPath()
+        cut.move(to: CGPoint(x: icon.minX - iconSize * 0.04,
+                             y: icon.maxY - iconSize * 0.19))
+        cut.addLine(to: CGPoint(x: icon.minX + iconSize * 0.14,
+                                y: icon.maxY + iconSize * 0.02))
+        cut.addLine(to: CGPoint(x: icon.maxX + iconSize * 0.04,
+                                y: icon.minY + iconSize * 0.19))
+        cut.addLine(to: CGPoint(x: icon.maxX - iconSize * 0.14,
+                                y: icon.minY - iconSize * 0.02))
+        cut.close()
+        cut.fill()
+        ctx.setBlendMode(.normal)
     case .word(let text, let weight):
         let size = fittedFontSize(text, base: rect.height * 0.52,
                                   minimum: rect.height * 0.27,
