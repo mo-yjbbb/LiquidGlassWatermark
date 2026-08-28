@@ -137,21 +137,33 @@ final class GlassRenderer: @unchecked Sendable {
             let rect = panelRect
             let ctx = renderer.cgContext
             let path = UIBezierPath(roundedRect: rect, cornerRadius: radius)
-            // Broad diagonal reflections make the surface read as a curved
-            // lens instead of a uniformly transparent rectangle.
+            // Transparent optical reflections cover the complete capsule.
+            // These are highlights only (no translucent fill), so the centre
+            // keeps the same clarity while still reading as curved glass.
             ctx.saveGState()
             path.addClip()
-            let reflection = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-                UIColor.white.withAlphaComponent(0.16).cgColor,
-                UIColor.white.withAlphaComponent(0.028).cgColor,
+            ctx.setBlendMode(.screen)
+            let surface = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
+                UIColor.white.withAlphaComponent(0.14).cgColor,
+                UIColor.white.withAlphaComponent(0.035).cgColor,
+                UIColor.white.withAlphaComponent(0.005).cgColor,
+                UIColor.white.withAlphaComponent(0.055).cgColor,
+                UIColor.white.withAlphaComponent(0.012).cgColor
+            ] as CFArray, locations: [0, 0.17, 0.48, 0.78, 1])!
+            ctx.drawLinearGradient(surface,
+                start: CGPoint(x: rect.minX, y: rect.maxY),
+                end: CGPoint(x: rect.maxX, y: rect.minY), options: [])
+
+            // A very soft travelling specular band gives the middle of the
+            // lens a liquid response without turning it milky.
+            let specular = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
+                UIColor.white.withAlphaComponent(0).cgColor,
+                UIColor.white.withAlphaComponent(0.045).cgColor,
                 UIColor.white.withAlphaComponent(0).cgColor
-            ] as CFArray, locations: [0, 0.38, 1])!
-            ctx.drawRadialGradient(reflection,
-                startCenter: CGPoint(x: rect.minX + rect.width * 0.12, y: rect.minY + height * 0.08),
-                startRadius: 0,
-                endCenter: CGPoint(x: rect.minX + rect.width * 0.18, y: rect.minY + height * 0.20),
-                endRadius: rect.width * 0.30,
-                options: [])
+            ] as CFArray, locations: [0, 0.5, 1])!
+            ctx.drawLinearGradient(specular,
+                start: CGPoint(x: rect.minX + rect.width * 0.18, y: rect.minY),
+                end: CGPoint(x: rect.maxX - rect.width * 0.18, y: rect.maxY), options: [])
             ctx.restoreGState()
 
             // One very thin highlight at the physical outer rim. Expanding
@@ -233,7 +245,7 @@ final class GlassRenderer: @unchecked Sendable {
         let overlay = overlayPanel.transformed(by: placement)
 
         return Layers(extent: extent, mask: mask, displacement: displacement,
-                      overlay: overlay, displacementScale: height * 0.105,
+                      overlay: overlay, displacementScale: height * 0.095,
                       blurRadius: 0,
                       lensPoint0: CGPoint(x: rect.minX + radius, y: rect.midY),
                       lensPoint1: CGPoint(x: rect.maxX - radius, y: rect.midY),
@@ -277,3 +289,4 @@ private func fittedFontSize(_ text: String, base: CGFloat, minimum: CGFloat,
     return max(minimum, base * maxWidth / width)
 }
 }
+

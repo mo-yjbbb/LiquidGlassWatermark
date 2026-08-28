@@ -17,7 +17,7 @@
     <key>CFBundleShortVersionString</key>
     <string>2.2</string>
     <key>CFBundleVersion</key>
-    <string>23</string>
+    <string>24</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>读取分享的照片或实况照片并添加水印。</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
@@ -43,3 +43,4 @@
     </dict>
 </dict>
 </plist>
+
