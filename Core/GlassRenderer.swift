@@ -141,17 +141,27 @@ final class GlassRenderer: @unchecked Sendable {
         }
         let mask = maskPanel.transformed(by: placement)
 
-        let opticalRimWidth = max(height * 0.055, 1.2 * scale)
+        let opticalRimWidth = max(height * 0.032, 0.9 * scale)
         let rimMaskPanel = raster(size: panelRect.size, opaque: false) { renderer in
             let ctx = renderer.cgContext
-            ctx.setStrokeColor(UIColor.white.cgColor)
             ctx.setLineWidth(opticalRimWidth)
             ctx.addPath(UIBezierPath(
-                roundedRect: panelRect.insetBy(dx: opticalRimWidth * 0.5,
-                                               dy: opticalRimWidth * 0.5),
-                cornerRadius: max(radius - opticalRimWidth * 0.5, 0)
+                roundedRect: panelRect.insetBy(dx: -opticalRimWidth * 0.55,
+                                               dy: -opticalRimWidth * 0.55),
+                cornerRadius: radius + opticalRimWidth * 0.55
             ).cgPath)
-            ctx.strokePath()
+            ctx.replacePathWithStrokedPath()
+            ctx.clip()
+            let directional = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
+                UIColor.white.withAlphaComponent(0.72).cgColor,
+                UIColor.white.withAlphaComponent(0.13).cgColor,
+                UIColor.white.withAlphaComponent(0).cgColor,
+                UIColor.white.withAlphaComponent(0.08).cgColor,
+                UIColor.white.withAlphaComponent(0.48).cgColor
+            ] as CFArray, locations: [0, 0.17, 0.50, 0.82, 1])!
+            ctx.drawLinearGradient(directional,
+                start: CGPoint(x: panelRect.midX, y: panelRect.minY),
+                end: CGPoint(x: panelRect.midX, y: panelRect.maxY), options: [])
         }
         let rimMask = rimMaskPanel.transformed(by: placement)
 
@@ -215,30 +225,6 @@ final class GlassRenderer: @unchecked Sendable {
             ctx.drawLinearGradient(specular,
                 start: CGPoint(x: rect.minX + rect.width * 0.18, y: rect.minY),
                 end: CGPoint(x: rect.maxX - rect.width * 0.18, y: rect.maxY), options: [])
-            ctx.restoreGState()
-
-            // One very thin highlight at the physical outer rim. Expanding
-            // the stroke path beyond the raster bounds keeps its inner half
-            // from reading as a second concentric rounded rectangle.
-            ctx.saveGState()
-            let rimWidth = max(0.95 * scale, 0.65)
-            let rimPath = UIBezierPath(roundedRect: rect.insetBy(dx: -rimWidth * 0.55,
-                                                                 dy: -rimWidth * 0.55),
-                                       cornerRadius: radius + rimWidth * 0.55)
-            ctx.addPath(rimPath.cgPath)
-            ctx.setLineWidth(rimWidth)
-            ctx.replacePathWithStrokedPath()
-            ctx.clip()
-            let edgeHighlight = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-                UIColor.white.withAlphaComponent(0.30).cgColor,
-                UIColor.white.withAlphaComponent(0.09).cgColor,
-                UIColor.white.withAlphaComponent(0).cgColor,
-                UIColor.white.withAlphaComponent(0.018).cgColor,
-                UIColor.white.withAlphaComponent(0.13).cgColor
-            ] as CFArray, locations: [0, 0.18, 0.52, 0.82, 1])!
-            ctx.drawLinearGradient(edgeHighlight,
-                start: CGPoint(x: rect.midX, y: rect.minY),
-                end: CGPoint(x: rect.midX, y: rect.maxY), options: [])
             ctx.restoreGState()
 
             let horizontalPadding = height * 0.34

@@ -256,6 +256,20 @@ private enum SharedPhotoLoader {
 
     private static func copyFile(from provider: NSItemProvider, type: String,
                                  fallbackExtension: String) async throws -> URL {
+        if let copied = try? await copyTemporaryRepresentation(from: provider, type: type,
+                                                               fallbackExtension: fallbackExtension) {
+            return copied
+        }
+        if let copied = try? await copyInPlaceRepresentation(from: provider, type: type,
+                                                             fallbackExtension: fallbackExtension) {
+            return copied
+        }
+        return try await copyDataRepresentation(from: provider, type: type,
+                                                fallbackExtension: fallbackExtension)
+    }
+
+    private static func copyTemporaryRepresentation(from provider: NSItemProvider, type: String,
+                                                     fallbackExtension: String) async throws -> URL {
         try await withCheckedThrowingContinuation { continuation in
             provider.loadFileRepresentation(forTypeIdentifier: type) { source, error in
                 if let error { continuation.resume(throwing: error); return }
@@ -267,6 +281,46 @@ private enum SharedPhotoLoader {
                     .appendingPathComponent(UUID().uuidString).appendingPathExtension(ext)
                 do {
                     try FileManager.default.copyItem(at: source, to: destination)
+                    continuation.resume(returning: destination)
+                } catch { continuation.resume(throwing: error) }
+            }
+        }
+    }
+
+    private static func copyInPlaceRepresentation(from provider: NSItemProvider, type: String,
+                                                   fallbackExtension: String) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            provider.loadInPlaceFileRepresentation(forTypeIdentifier: type) { source, _, error in
+                if let error { continuation.resume(throwing: error); return }
+                guard let source else {
+                    continuation.resume(throwing: WatermarkError.assetUnavailable); return
+                }
+                let ext = source.pathExtension.isEmpty ? fallbackExtension : source.pathExtension
+                let destination = FileManager.default.temporaryDirectory
+                    .appendingPathComponent(UUID().uuidString).appendingPathExtension(ext)
+                do {
+                    let accessed = source.startAccessingSecurityScopedResource()
+                    defer { if accessed { source.stopAccessingSecurityScopedResource() } }
+                    try FileManager.default.copyItem(at: source, to: destination)
+                    continuation.resume(returning: destination)
+                } catch { continuation.resume(throwing: error) }
+            }
+        }
+    }
+
+    private static func copyDataRepresentation(from provider: NSItemProvider, type: String,
+                                                fallbackExtension: String) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            provider.loadDataRepresentation(forTypeIdentifier: type) { data, error in
+                if let error { continuation.resume(throwing: error); return }
+                guard let data, !data.isEmpty else {
+                    continuation.resume(throwing: WatermarkError.assetUnavailable); return
+                }
+                let destination = FileManager.default.temporaryDirectory
+                    .appendingPathComponent(UUID().uuidString)
+                    .appendingPathExtension(fallbackExtension)
+                do {
+                    try data.write(to: destination, options: .atomic)
                     continuation.resume(returning: destination)
                 } catch { continuation.resume(throwing: error) }
             }
