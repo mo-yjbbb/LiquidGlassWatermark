@@ -24,11 +24,15 @@ final class GlassRenderer: @unchecked Sendable {
     }
 
     private let metadata: WatermarkMetadata
+    private let enablesDiffraction: Bool
     private let context = CIContext(options: [.cacheIntermediates: false, .useSoftwareRenderer: false])
     private let lock = NSLock()
     private var cache: [Key: Layers] = [:]
 
-    init(metadata: WatermarkMetadata) { self.metadata = metadata }
+    init(metadata: WatermarkMetadata, enablesDiffraction: Bool = true) {
+        self.metadata = metadata
+        self.enablesDiffraction = enablesDiffraction
+    }
 
     func render(_ source: CIImage) -> CIImage {
         let extent = source.extent.integral
@@ -69,6 +73,10 @@ final class GlassRenderer: @unchecked Sendable {
             kCIInputBackgroundImageKey: glass,
             kCIInputMaskImageKey: layers.rimMask
         ])
+
+        guard enablesDiffraction else {
+            return layers.overlay.composited(over: opticallyRimmed).cropped(to: layers.extent)
+        }
 
         // Sub-pixel RGB separation at the curved rim simulates wavelength
         // diffraction. It is derived entirely from the photo underneath and

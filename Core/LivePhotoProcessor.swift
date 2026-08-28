@@ -30,11 +30,11 @@ enum LivePhotoProcessor {
         let renderedPhoto = work.appendingPathComponent("rendered.jpg")
         let renderedVideo = work.appendingPathComponent("rendered.mov")
         let renderer = GlassRenderer(metadata: metadata)
+        let videoRenderer = GlassRenderer(metadata: metadata, enablesDiffraction: false)
         try renderStill(sourcePhoto, to: renderedPhoto, renderer: renderer,
                         maxDimension: maxStillDimension)
         progress(0.12)
-        try await renderVideo(sourceVideo, to: renderedVideo, renderer: renderer,
-                              maxWorkingDimension: maxStillDimension) {
+        try await renderVideo(sourceVideo, to: renderedVideo, renderer: videoRenderer) {
             progress(0.12 + $0 * 0.68)
         }
         let assembled = try await LivePhotoAssembler().makePair(
@@ -67,11 +67,11 @@ enum LivePhotoProcessor {
         let renderedPhoto = work.appendingPathComponent("rendered.jpg")
         let renderedVideo = work.appendingPathComponent("rendered.mov")
         let renderer = GlassRenderer(metadata: metadata)
+        let videoRenderer = GlassRenderer(metadata: metadata, enablesDiffraction: false)
         try renderStill(sharedPhotoURL, to: renderedPhoto, renderer: renderer,
                         maxDimension: maxStillDimension)
         progress(0.12)
-        try await renderVideo(pairedVideoURL, to: renderedVideo, renderer: renderer,
-                              maxWorkingDimension: min(maxStillDimension, 1600)) {
+        try await renderVideo(pairedVideoURL, to: renderedVideo, renderer: videoRenderer) {
             progress(0.12 + $0 * 0.68)
         }
         let assembled = try await LivePhotoAssembler().makePair(
@@ -121,7 +121,6 @@ enum LivePhotoProcessor {
 
     private static func renderVideo(_ sourceURL: URL, to outputURL: URL,
                                     renderer: GlassRenderer,
-                                    maxWorkingDimension: CGFloat,
                                     progress: @escaping @Sendable (Double) -> Void) async throws {
         let asset = AVURLAsset(url: sourceURL)
         guard let session = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetHighestQuality) else {
@@ -129,22 +128,9 @@ enum LivePhotoProcessor {
         }
         let composition = AVVideoComposition(asset: asset) { request in
             autoreleasepool {
-                // Share extensions have a much smaller memory allowance than
-                // the host app. Work on a bounded frame, then scale the result
-                // back to the composition extent so the Live Photo retains its
-                // original geometry and never silently becomes a still image.
                 let original = request.sourceImage
-                let longest = max(original.extent.width, original.extent.height)
-                let scale = min(1, maxWorkingDimension / max(longest, 1))
-                let working = scale < 1
-                    ? original.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-                    : original
-                var rendered = renderer.render(working).cropped(to: working.extent)
-                if scale < 1 {
-                    rendered = rendered.transformed(by: CGAffineTransform(scaleX: 1 / scale,
-                                                                           y: 1 / scale))
-                }
-                request.finish(with: rendered.cropped(to: original.extent), context: nil)
+                let rendered = renderer.render(original).cropped(to: original.extent)
+                request.finish(with: rendered, context: nil)
             }
         }
         try? FileManager.default.removeItem(at: outputURL)
