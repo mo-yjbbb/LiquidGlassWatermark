@@ -75,36 +75,36 @@ final class GlassRenderer: @unchecked Sendable {
             return layers.overlay.composited(over: opticallyRimmed).cropped(to: layers.extent)
         }
 
-        // Sub-pixel RGB separation at the curved rim simulates wavelength
-        // diffraction. It is derived entirely from the photo underneath and
-        // remains confined to the optical rim mask.
-        let spectralOffset = max(min(extent.width, extent.height) * 0.00115, 0.55)
+        // Sub-pixel RGB separation covers the complete optical body, not only
+        // its rim. The amount is deliberately subtle so it reads as coloured
+        // refraction from the underlying photo instead of a painted overlay.
+        let spectralOffset = max(min(extent.width, extent.height) * 0.00135, 0.65)
         let red = source.applyingFilter("CIColorMatrix", parameters: [
-            "inputRVector": CIVector(x: 0.22, y: 0, z: 0, w: 0),
+            "inputRVector": CIVector(x: 0.070, y: 0, z: 0, w: 0),
             "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
             "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0)
         ]).transformed(by: CGAffineTransform(translationX: spectralOffset, y: 0))
         let green = source.applyingFilter("CIColorMatrix", parameters: [
             "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0),
-            "inputGVector": CIVector(x: 0, y: 0.15, z: 0, w: 0),
+            "inputGVector": CIVector(x: 0, y: 0.045, z: 0, w: 0),
             "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0)
         ])
         let blue = source.applyingFilter("CIColorMatrix", parameters: [
             "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0),
             "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
-            "inputBVector": CIVector(x: 0, y: 0, z: 0.22, w: 0)
+            "inputBVector": CIVector(x: 0, y: 0, z: 0.070, w: 0)
         ]).transformed(by: CGAffineTransform(translationX: -spectralOffset, y: 0))
         let spectrum = red.applyingFilter("CIAdditionCompositing", parameters: [
             kCIInputBackgroundImageKey: green
         ]).applyingFilter("CIAdditionCompositing", parameters: [
             kCIInputBackgroundImageKey: blue
         ]).cropped(to: extent)
-        let diffractedRim = spectrum.applyingFilter("CIScreenBlendMode", parameters: [
+        let diffractedBody = spectrum.applyingFilter("CIScreenBlendMode", parameters: [
             kCIInputBackgroundImageKey: opticallyRimmed
         ])
-        let liquidGlass = diffractedRim.applyingFilter("CIBlendWithMask", parameters: [
+        let liquidGlass = diffractedBody.applyingFilter("CIBlendWithMask", parameters: [
             kCIInputBackgroundImageKey: opticallyRimmed,
-            kCIInputMaskImageKey: layers.rimMask
+            kCIInputMaskImageKey: layers.mask
         ])
         return layers.overlay.composited(over: liquidGlass).cropped(to: layers.extent)
     }
@@ -224,7 +224,7 @@ final class GlassRenderer: @unchecked Sendable {
             // lens a liquid response without turning it milky.
             let specular = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
                 UIColor.white.withAlphaComponent(0).cgColor,
-                UIColor.white.withAlphaComponent(0.018).cgColor,
+                UIColor.white.withAlphaComponent(0.052).cgColor,
                 UIColor.white.withAlphaComponent(0).cgColor
             ] as CFArray, locations: [0, 0.5, 1])!
             ctx.drawLinearGradient(specular,
@@ -320,7 +320,7 @@ final class GlassRenderer: @unchecked Sendable {
         let overlay = overlayPanel.transformed(by: placement)
 
         return Layers(extent: extent, mask: mask, rimMask: rimMask, displacement: displacement,
-                      overlay: overlay, displacementScale: height * 0.105,
+                      overlay: overlay, displacementScale: height * 0.155,
                       blurRadius: 0,
                       lensPoint0: CGPoint(x: rect.minX + radius, y: rect.midY),
                       lensPoint1: CGPoint(x: rect.maxX - radius, y: rect.midY),
