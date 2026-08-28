@@ -211,12 +211,19 @@ final class GlassRenderer: @unchecked Sendable {
                                   parameterLineHeight + locationLineHeight + height * 0.035)
             let groupMinY = rect.midY - groupHeight * 0.5
             let groupMaxY = groupMinY + groupHeight
-            let logoLineHeightRatio = UIFont.systemFont(ofSize: 100, weight: .medium).lineHeight / 100
-            let logoSize = groupHeight / logoLineHeightRatio
-            let logoWidth = textWidth("", size: logoSize, weight: .medium)
+            let brand = brandMark(for: metadata.device)
+            let logoLineHeightRatio = UIFont.systemFont(ofSize: 100, weight: brand.weight).lineHeight / 100
+            let idealLogoSize = groupHeight / logoLineHeightRatio
+            let logoSize = fittedFontSize(brand.text, base: idealLogoSize,
+                                          minimum: idealLogoSize * 0.46,
+                                          maxWidth: height * 1.18,
+                                          weight: brand.weight)
+            let logoWidth = textWidth(brand.text, size: logoSize, weight: brand.weight)
             let logoX = separatorX - height * 0.16 - logoWidth
-            draw("", at: CGPoint(x: logoX, y: groupMinY),
-                 size: logoSize, weight: .medium)
+            let logoLineHeight = UIFont.systemFont(ofSize: logoSize, weight: brand.weight).lineHeight
+            draw(brand.text,
+                 at: CGPoint(x: logoX, y: rect.midY - logoLineHeight * 0.5),
+                 size: logoSize, weight: brand.weight)
 
             ctx.saveGState()
             ctx.setStrokeColor(UIColor.white.withAlphaComponent(0.62).cgColor)
@@ -276,6 +283,30 @@ private func fittedFontSize(_ text: String, base: CGFloat, minimum: CGFloat,
     let width = textWidth(text, size: base, weight: weight)
     guard width > maxWidth, width > 0 else { return base }
     return max(minimum, base * maxWidth / width)
+}
+
+private func brandMark(for device: String) -> (text: String, weight: UIFont.Weight) {
+    let value = device.lowercased()
+    if value.contains("iphone") || value.contains("apple") { return ("", .medium) }
+    if value.contains("xiaomi") || value.contains("redmi") || value.contains("poco") {
+        return ("mi", .bold)
+    }
+    if value.contains("huawei") { return ("HUAWEI", .semibold) }
+    if value.contains("honor") { return ("HONOR", .semibold) }
+    if value.contains("oneplus") || value.contains("one plus") { return ("1+", .bold) }
+    if value.contains("oppo") { return ("OPPO", .semibold) }
+    if value.contains("vivo") || value.contains("iqoo") { return ("vivo", .semibold) }
+    if value.contains("samsung") || value.contains("galaxy") { return ("SAMSUNG", .bold) }
+    if value.contains("google") || value.contains("pixel") { return ("G", .bold) }
+    if value.contains("sony") || value.contains("xperia") { return ("SONY", .semibold) }
+    if value.contains("realme") { return ("realme", .bold) }
+    if value.contains("motorola") || value.hasPrefix("moto") { return ("M", .bold) }
+    if value.contains("nubia") || value.contains("redmagic") { return ("nubia", .semibold) }
+    if value.contains("leica") { return ("Leica", .semibold) }
+    if value.contains("nikon") { return ("Nikon", .bold) }
+    if value.contains("canon") { return ("Canon", .bold) }
+    if value.contains("fujifilm") || value.contains("fuji") { return ("FUJI", .bold) }
+    return ("◉", .semibold)
 }
 }
 
