@@ -351,14 +351,17 @@ private func fittedFontSize(_ text: String, base: CGFloat, minimum: CGFloat,
 private func brandMark(for device: String) -> (text: String, weight: UIFont.Weight) {
     let value = device.lowercased()
     if value.contains("iphone") || value.contains("apple") { return ("", .medium) }
+    // Prefer the imaging partner used by the phone family. When no known
+    // partnership exists, fall back to the device maker's own word mark.
     if value.contains("xiaomi") || value.contains("redmi") || value.contains("poco") {
-        return ("mi", .bold)
+        return ("Leica", .semibold)
     }
     if value.contains("huawei") { return ("HUAWEI", .semibold) }
     if value.contains("honor") { return ("HONOR", .semibold) }
-    if value.contains("oneplus") || value.contains("one plus") { return ("1+", .bold) }
-    if value.contains("oppo") { return ("OPPO", .semibold) }
-    if value.contains("vivo") || value.contains("iqoo") { return ("vivo", .semibold) }
+    if value.contains("oneplus") || value.contains("one plus") || value.contains("oppo") {
+        return ("HASSELBLAD", .semibold)
+    }
+    if value.contains("vivo") || value.contains("iqoo") { return ("ZEISS", .bold) }
     if value.contains("samsung") || value.contains("galaxy") { return ("SAMSUNG", .bold) }
     if value.contains("google") || value.contains("pixel") { return ("G", .bold) }
     if value.contains("sony") || value.contains("xperia") { return ("SONY", .semibold) }
