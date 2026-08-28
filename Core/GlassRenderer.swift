@@ -132,7 +132,7 @@ final class GlassRenderer: @unchecked Sendable {
         let shortSide = min(extent.width, extent.height)
         let scale = max(shortSide / 1080, 0.35)
         let margin = max(shortSide * 0.012, 8 * scale)
-        let height = shortSide * 0.108
+        let height = shortSide * 0.135
         // Core Image uses a bottom-left origin. Keep the capsule at the visual bottom.
         let rect = CGRect(x: extent.minX + margin, y: extent.minY + margin,
                           width: extent.width - margin * 2, height: height)
@@ -214,6 +214,10 @@ final class GlassRenderer: @unchecked Sendable {
             let rect = panelRect
             let ctx = renderer.cgContext
             let path = UIBezierPath(roundedRect: rect, cornerRadius: radius)
+            // Almost-clear optical base. This is a uniform tint rather than a
+            // white gradient, and exists only to keep glass readable on black.
+            UIColor.white.withAlphaComponent(0.012).setFill()
+            path.fill()
             // Transparent optical reflections cover the complete capsule.
             // These are highlights only (no translucent fill), so the centre
             // keeps the same clarity while still reading as curved glass.
@@ -236,13 +240,13 @@ final class GlassRenderer: @unchecked Sendable {
             // fade before the rounded corners, so this can never read as a
             // closed outline. No shadow, blur, or outer glow is used.
             let hairline = max(0.81 * scale, 0.66)
-            let horizontalLight = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-                UIColor.white.withAlphaComponent(0.13).cgColor,
-                UIColor.white.withAlphaComponent(0.22).cgColor,
+            let edgeLight = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
                 UIColor.white.withAlphaComponent(0.38).cgColor,
-                UIColor.white.withAlphaComponent(0.22).cgColor,
-                UIColor.white.withAlphaComponent(0.13).cgColor
-            ] as CFArray, locations: [0, 0.10, 0.50, 0.90, 1])!
+                UIColor.white.withAlphaComponent(0).cgColor,
+                UIColor.white.withAlphaComponent(0).cgColor,
+                UIColor.white.withAlphaComponent(0).cgColor,
+                UIColor.white.withAlphaComponent(0.34).cgColor
+            ] as CFArray, locations: [0, 0.17, 0.50, 0.83, 1])!
             ctx.saveGState()
             let edge = UIBezierPath(roundedRect: rect.insetBy(dx: hairline * 0.5,
                                                               dy: hairline * 0.5),
@@ -251,17 +255,12 @@ final class GlassRenderer: @unchecked Sendable {
             ctx.setLineWidth(hairline)
             ctx.replacePathWithStrokedPath()
             ctx.clip()
-            // Keep the top/bottom runs plus only the first part of each arc;
-            // the vertical side centres remain completely transparent.
-            ctx.clip(to: [
-                CGRect(x: rect.minX, y: rect.minY,
-                       width: rect.width, height: radius * 0.34),
-                CGRect(x: rect.minX, y: rect.maxY - radius * 0.34,
-                       width: rect.width, height: radius * 0.34)
-            ])
-            ctx.drawLinearGradient(horizontalLight,
-                start: CGPoint(x: rect.minX, y: rect.midY),
-                end: CGPoint(x: rect.maxX, y: rect.midY), options: [])
+            // A vertical alpha ramp keeps both horizontal runs bright and
+            // makes their curved continuations fade continuously to zero.
+            // There is no rectangular clipping edge and no side-centre line.
+            ctx.drawLinearGradient(edgeLight,
+                start: CGPoint(x: rect.midX, y: rect.minY),
+                end: CGPoint(x: rect.midX, y: rect.maxY), options: [])
             ctx.restoreGState()
 
             let horizontalPadding = height * 0.34
@@ -320,7 +319,7 @@ final class GlassRenderer: @unchecked Sendable {
         let overlay = overlayPanel.transformed(by: placement)
 
         return Layers(extent: extent, mask: mask, rimMask: rimMask, displacement: displacement,
-                      overlay: overlay, displacementScale: height * 0.155,
+                      overlay: overlay, displacementScale: height * 0.265,
                       blurRadius: 0,
                       lensPoint0: CGPoint(x: rect.minX + radius, y: rect.midY),
                       lensPoint1: CGPoint(x: rect.maxX - radius, y: rect.midY),
