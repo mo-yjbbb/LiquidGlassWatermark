@@ -168,11 +168,12 @@ final class GlassRenderer: @unchecked Sendable {
             ctx.replacePathWithStrokedPath()
             ctx.clip()
             let edgeHighlight = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-                UIColor.white.withAlphaComponent(0.38).cgColor,
-                UIColor.white.withAlphaComponent(0.12).cgColor,
+                UIColor.white.withAlphaComponent(0.54).cgColor,
+                UIColor.white.withAlphaComponent(0.18).cgColor,
                 UIColor.white.withAlphaComponent(0).cgColor,
-                UIColor.white.withAlphaComponent(0).cgColor
-            ] as CFArray, locations: [0, 0.20, 0.50, 1])!
+                UIColor.white.withAlphaComponent(0.035).cgColor,
+                UIColor.white.withAlphaComponent(0.24).cgColor
+            ] as CFArray, locations: [0, 0.18, 0.52, 0.82, 1])!
             ctx.drawLinearGradient(edgeHighlight,
                 start: CGPoint(x: rect.midX, y: rect.minY),
                 end: CGPoint(x: rect.midX, y: rect.maxY), options: [])
