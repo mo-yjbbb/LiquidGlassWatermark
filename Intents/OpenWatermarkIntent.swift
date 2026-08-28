@@ -7,7 +7,8 @@ struct OpenWatermarkIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        .result()
+        UserDefaults.standard.set(true, forKey: "LGWOpenPhotoPicker")
+        return .result()
     }
 }
 

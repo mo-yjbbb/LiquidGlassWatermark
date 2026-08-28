@@ -4,6 +4,7 @@ import PhotosUI
 import UniformTypeIdentifiers
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var model = WatermarkModel()
     @State private var showingPicker = false
     @State private var pendingSelection: PickedPhoto?
@@ -72,7 +73,22 @@ struct ContentView: View {
             } message: {
                 Text("覆盖原图会在确认新照片完整保存后删除原始照片。")
             }
+            .onAppear { consumeShortcutLaunch() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { consumeShortcutLaunch() }
+            }
+            .onOpenURL { url in
+                guard url.scheme == "liquidglasswatermark", url.host == "pick" else { return }
+                showingPicker = true
+            }
         }
+    }
+
+    private func consumeShortcutLaunch() {
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: "LGWOpenPhotoPicker") else { return }
+        defaults.removeObject(forKey: "LGWOpenPhotoPicker")
+        showingPicker = true
     }
 
     private func processPending(_ mode: WatermarkModel.SaveMode) {
@@ -158,3 +174,4 @@ private struct AssetPicker: UIViewControllerRepresentable {
         }
     }
 }
+
