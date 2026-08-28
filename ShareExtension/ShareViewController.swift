@@ -114,6 +114,14 @@ final class ShareViewController: UIViewController {
                                                       maxDimension: 2048)
             }
             await setStatus("正在确认图库结果", progress: 0.96)
+            // A copied asset that keeps the original PHAsset creation date is
+            // inserted years back in Recents, which looks exactly like a
+            // failed save from the Photos share sheet. Keep the embedded EXIF
+            // capture date for the watermark/metadata, but place a new copy at
+            // the current library date so it is immediately visible.
+            if saveMode == .newCopy {
+                try await SharedSaveVerifier.makeVisibleInRecents(identifier: newIdentifier)
+            }
             try await SharedSaveVerifier.verifyAndFile(identifier: newIdentifier,
                                                         requiresLive: payload.isLivePhoto)
             if saveMode == .replaceOriginal, let original {
@@ -123,10 +131,10 @@ final class ShareViewController: UIViewController {
                 }
             }
             await setStatus(payload.isLivePhoto
-                            ? "已保存到“液态玻璃水印”相簿（Live Photo）"
-                            : "已保存到“液态玻璃水印”相簿",
+                            ? "已保存到最近项目顶部和“液态玻璃水印”相簿（Live Photo）"
+                            : "已保存到最近项目顶部和“液态玻璃水印”相簿",
                             progress: 1)
-            try? await Task.sleep(for: .milliseconds(650))
+            try? await Task.sleep(for: .milliseconds(1200))
             extensionContext?.completeRequest(returningItems: nil)
         } catch is CancellationError {
             extensionContext?.cancelRequest(withError: CocoaError(.userCancelled))
@@ -216,7 +224,21 @@ private enum SharedPhotoLoader {
                                                fallbackExtension: "mov")
             }
         }
-        guard let photoURL else { throw WatermarkError.assetUnavailable }
+        guard var photoURL else { throw WatermarkError.assetUnavailable }
+
+        // Xiaomi, Samsung, Google and other vendors commonly share a Motion
+        // Photo as one JPEG/HEIC with an MP4 appended to it. Photos does not
+        // advertise those files as UTType.livePhoto, so recover the pair here
+        // instead of silently treating it as a still image.
+        if videoURL == nil, MotionPhotoExtractor.containsEmbeddedVideo(at: photoURL) {
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("LGW-SharedMotion-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let embedded = try MotionPhotoExtractor.extract(from: photoURL, to: directory)
+            try? FileManager.default.removeItem(at: photoURL)
+            photoURL = embedded.photoURL
+            videoURL = embedded.videoURL
+        }
         return SharedPhotoPayload(photoURL: photoURL, videoURL: videoURL,
                                   isLivePhoto: advertisedLive || videoURL != nil)
     }
@@ -297,6 +319,19 @@ private enum SharedSaveVerifier {
         }
     }
 
+    static func makeVisibleInRecents(identifier: String) async throws {
+        let asset = try await waitForAsset(identifier: identifier, requiresLive: false)
+        try await PHPhotoLibrary.shared().performChanges {
+            PHAssetChangeRequest(for: asset).creationDate = Date()
+        }
+        guard let refreshed = PHAsset.fetchAssets(withLocalIdentifiers: [identifier],
+                                                  options: nil).firstObject,
+              let date = refreshed.creationDate,
+              abs(date.timeIntervalSinceNow) < 60 else {
+            throw WatermarkError.renderFailed
+        }
+    }
+
     private static func waitForAsset(identifier: String, requiresLive: Bool) async throws -> PHAsset {
         for attempt in 0..<12 {
             if let asset = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject {
@@ -328,3 +363,4 @@ private enum SharedSaveVerifier {
         return album
     }
 }
+

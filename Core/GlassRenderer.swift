@@ -143,22 +143,11 @@ final class GlassRenderer: @unchecked Sendable {
             ctx.saveGState()
             path.addClip()
             ctx.setBlendMode(.screen)
-            let surface = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-                UIColor.white.withAlphaComponent(0.14).cgColor,
-                UIColor.white.withAlphaComponent(0.035).cgColor,
-                UIColor.white.withAlphaComponent(0.005).cgColor,
-                UIColor.white.withAlphaComponent(0.055).cgColor,
-                UIColor.white.withAlphaComponent(0.012).cgColor
-            ] as CFArray, locations: [0, 0.17, 0.48, 0.78, 1])!
-            ctx.drawLinearGradient(surface,
-                start: CGPoint(x: rect.minX, y: rect.maxY),
-                end: CGPoint(x: rect.maxX, y: rect.minY), options: [])
-
             // A very soft travelling specular band gives the middle of the
             // lens a liquid response without turning it milky.
             let specular = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
                 UIColor.white.withAlphaComponent(0).cgColor,
-                UIColor.white.withAlphaComponent(0.045).cgColor,
+                UIColor.white.withAlphaComponent(0.018).cgColor,
                 UIColor.white.withAlphaComponent(0).cgColor
             ] as CFArray, locations: [0, 0.5, 1])!
             ctx.drawLinearGradient(specular,
