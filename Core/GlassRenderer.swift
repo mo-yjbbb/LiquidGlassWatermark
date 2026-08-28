@@ -13,6 +13,7 @@ final class GlassRenderer: @unchecked Sendable {
     private struct Layers {
         let extent: CGRect
         let mask: CIImage
+        let rimMask: CIImage
         let displacement: CIImage
         let overlay: CIImage
         let displacementScale: CGFloat
@@ -53,7 +54,22 @@ final class GlassRenderer: @unchecked Sendable {
             kCIInputBackgroundImageKey: source,
             kCIInputMaskImageKey: layers.mask
         ])
-        return layers.overlay.composited(over: glass).cropped(to: layers.extent)
+        // The physical rim reflects the actual pixels underneath it. Bright
+        // and colourful areas therefore create stronger coloured highlights,
+        // while dark areas stay subtle instead of receiving a painted line.
+        let liftedSource = source.applyingFilter("CIColorControls", parameters: [
+            kCIInputSaturationKey: 1.12,
+            kCIInputBrightnessKey: 0.012,
+            kCIInputContrastKey: 1.10
+        ])
+        let reflectedRim = liftedSource.applyingFilter("CIScreenBlendMode", parameters: [
+            kCIInputBackgroundImageKey: glass
+        ]).cropped(to: extent)
+        let opticallyRimmed = reflectedRim.applyingFilter("CIBlendWithMask", parameters: [
+            kCIInputBackgroundImageKey: glass,
+            kCIInputMaskImageKey: layers.rimMask
+        ])
+        return layers.overlay.composited(over: opticallyRimmed).cropped(to: layers.extent)
     }
 
     func makeCGImage(_ image: CIImage) -> CGImage? {
@@ -92,6 +108,20 @@ final class GlassRenderer: @unchecked Sendable {
             UIBezierPath(roundedRect: panelRect, cornerRadius: radius).fill()
         }
         let mask = maskPanel.transformed(by: placement)
+
+        let opticalRimWidth = max(height * 0.055, 1.2 * scale)
+        let rimMaskPanel = raster(size: panelRect.size, opaque: false) { renderer in
+            let ctx = renderer.cgContext
+            ctx.setStrokeColor(UIColor.white.cgColor)
+            ctx.setLineWidth(opticalRimWidth)
+            ctx.addPath(UIBezierPath(
+                roundedRect: panelRect.insetBy(dx: opticalRimWidth * 0.5,
+                                               dy: opticalRimWidth * 0.5),
+                cornerRadius: max(radius - opticalRimWidth * 0.5, 0)
+            ).cgPath)
+            ctx.strokePath()
+        }
+        let rimMask = rimMaskPanel.transformed(by: placement)
 
         let displacementPanel = raster(size: panelRect.size, opaque: true) { renderer in
             let rect = panelRect
@@ -168,11 +198,11 @@ final class GlassRenderer: @unchecked Sendable {
             ctx.replacePathWithStrokedPath()
             ctx.clip()
             let edgeHighlight = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-                UIColor.white.withAlphaComponent(0.54).cgColor,
-                UIColor.white.withAlphaComponent(0.18).cgColor,
+                UIColor.white.withAlphaComponent(0.30).cgColor,
+                UIColor.white.withAlphaComponent(0.09).cgColor,
                 UIColor.white.withAlphaComponent(0).cgColor,
-                UIColor.white.withAlphaComponent(0.035).cgColor,
-                UIColor.white.withAlphaComponent(0.24).cgColor
+                UIColor.white.withAlphaComponent(0.018).cgColor,
+                UIColor.white.withAlphaComponent(0.13).cgColor
             ] as CFArray, locations: [0, 0.18, 0.52, 0.82, 1])!
             ctx.drawLinearGradient(edgeHighlight,
                 start: CGPoint(x: rect.midX, y: rect.minY),
@@ -241,7 +271,7 @@ final class GlassRenderer: @unchecked Sendable {
         }
         let overlay = overlayPanel.transformed(by: placement)
 
-        return Layers(extent: extent, mask: mask, displacement: displacement,
+        return Layers(extent: extent, mask: mask, rimMask: rimMask, displacement: displacement,
                       overlay: overlay, displacementScale: height * 0.105,
                       blurRadius: 0,
                       lensPoint0: CGPoint(x: rect.minX + radius, y: rect.midY),
