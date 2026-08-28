@@ -232,29 +232,37 @@ final class GlassRenderer: @unchecked Sendable {
                 end: CGPoint(x: rect.maxX - rect.width * 0.18, y: rect.maxY), options: [])
             ctx.restoreGState()
 
-            // Two hairline reflections at the physical top and bottom edges.
-            // The side midpoint is transparent: this is not an outline and
-            // no blur or outer glow is applied.
-            ctx.saveGState()
-            let hairline = max(0.62 * scale, 0.48)
-            let edge = UIBezierPath(roundedRect: rect.insetBy(dx: -hairline * 0.60,
-                                                              dy: -hairline * 0.60),
-                                    cornerRadius: radius + hairline * 0.60)
-            ctx.addPath(edge.cgPath)
-            ctx.setLineWidth(hairline)
-            ctx.replacePathWithStrokedPath()
-            ctx.clip()
-            let hairlineLight = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-                UIColor.white.withAlphaComponent(0.40).cgColor,
-                UIColor.white.withAlphaComponent(0.06).cgColor,
+            // Two independent horizontal hairline reflections. They stop and
+            // fade before the rounded corners, so this can never read as a
+            // closed outline. No shadow, blur, or outer glow is used.
+            let hairline = max(0.54 * scale, 0.44)
+            let lineInset = max(radius * 0.78, height * 0.34)
+            let lineMinX = rect.minX + lineInset
+            let lineMaxX = rect.maxX - lineInset
+            let horizontalLight = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
                 UIColor.white.withAlphaComponent(0).cgColor,
-                UIColor.white.withAlphaComponent(0.05).cgColor,
-                UIColor.white.withAlphaComponent(0.30).cgColor
-            ] as CFArray, locations: [0, 0.16, 0.48, 0.84, 1])!
-            ctx.drawLinearGradient(hairlineLight,
-                start: CGPoint(x: rect.midX, y: rect.minY),
-                end: CGPoint(x: rect.midX, y: rect.maxY), options: [])
-            ctx.restoreGState()
+                UIColor.white.withAlphaComponent(0.22).cgColor,
+                UIColor.white.withAlphaComponent(0.38).cgColor,
+                UIColor.white.withAlphaComponent(0.22).cgColor,
+                UIColor.white.withAlphaComponent(0).cgColor
+            ] as CFArray, locations: [0, 0.10, 0.50, 0.90, 1])!
+
+            func drawHorizontalHairline(at y: CGFloat) {
+                ctx.saveGState()
+                ctx.move(to: CGPoint(x: lineMinX, y: y))
+                ctx.addLine(to: CGPoint(x: lineMaxX, y: y))
+                ctx.setLineWidth(hairline)
+                ctx.setLineCap(.butt)
+                ctx.replacePathWithStrokedPath()
+                ctx.clip()
+                ctx.drawLinearGradient(horizontalLight,
+                    start: CGPoint(x: lineMinX, y: y),
+                    end: CGPoint(x: lineMaxX, y: y), options: [])
+                ctx.restoreGState()
+            }
+
+            drawHorizontalHairline(at: rect.minY + hairline * 0.5)
+            drawHorizontalHairline(at: rect.maxY - hairline * 0.5)
 
             let horizontalPadding = height * 0.34
             let leftX = rect.minX + horizontalPadding
