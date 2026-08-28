@@ -44,13 +44,10 @@ final class GlassRenderer: @unchecked Sendable {
         // Keep the interior optically clear. Liquid depth comes from gentle
         // refraction and reflections, not a frosted/blurred fill.
         let opticalSource = source.clampedToExtent()
-        let refracted = opticalSource.applyingFilter("CIGlassLozenge", parameters: [
-            "inputPoint0": CIVector(cgPoint: layers.lensPoint0),
-            "inputPoint1": CIVector(cgPoint: layers.lensPoint1),
-            "inputRadius": layers.lensRadius,
-            "inputRefraction": 1.10
-        ])
-        let displaced = refracted.applyingFilter("CIDisplacementDistortion", parameters: [
+        // CIDisplacementDistortion supplies the liquid refraction. Avoid
+        // CIGlassLozenge here because it draws its own inset optical boundary,
+        // which reads as a second concentric rounded rectangle.
+        let displaced = opticalSource.applyingFilter("CIDisplacementDistortion", parameters: [
             "inputDisplacementImage": layers.displacement,
             kCIInputScaleKey: layers.displacementScale
         ]).cropped(to: extent)
@@ -149,7 +146,7 @@ final class GlassRenderer: @unchecked Sendable {
         }
         let mask = maskPanel.transformed(by: placement)
 
-        let opticalRimWidth = max(height * 0.032, 0.9 * scale)
+        let opticalRimWidth = max(0.9 * scale, 0.65)
         let rimMaskPanel = raster(size: panelRect.size, opaque: false) { renderer in
             let ctx = renderer.cgContext
             ctx.setLineWidth(opticalRimWidth)
@@ -233,6 +230,20 @@ final class GlassRenderer: @unchecked Sendable {
             ctx.drawLinearGradient(specular,
                 start: CGPoint(x: rect.minX + rect.width * 0.18, y: rect.minY),
                 end: CGPoint(x: rect.maxX - rect.width * 0.18, y: rect.maxY), options: [])
+            ctx.restoreGState()
+
+            // Exactly one hairline highlight on the physical boundary. The
+            // path sits mostly outside the raster, so it cannot form an inset
+            // or a second rounded rectangle.
+            ctx.saveGState()
+            let hairline = max(0.62 * scale, 0.48)
+            let edge = UIBezierPath(roundedRect: rect.insetBy(dx: -hairline * 0.60,
+                                                              dy: -hairline * 0.60),
+                                    cornerRadius: radius + hairline * 0.60)
+            ctx.addPath(edge.cgPath)
+            ctx.setStrokeColor(UIColor.white.withAlphaComponent(0.34).cgColor)
+            ctx.setLineWidth(hairline)
+            ctx.strokePath()
             ctx.restoreGState()
 
             let horizontalPadding = height * 0.34
