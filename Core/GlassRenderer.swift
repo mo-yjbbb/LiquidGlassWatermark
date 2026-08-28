@@ -47,7 +47,22 @@ final class GlassRenderer: @unchecked Sendable {
         // CIDisplacementDistortion supplies the liquid refraction. Avoid
         // CIGlassLozenge here because it draws its own inset optical boundary,
         // which reads as a second concentric rounded rectangle.
-        let displaced = opticalSource.applyingFilter("CIDisplacementDistortion", parameters: [
+        // Two broad, non-linear optical waves bend straight structures inside
+        // the lens. The previous linear map mostly translated pixels and was
+        // therefore technically active but visually indistinguishable.
+        let waveA = opticalSource.applyingFilter("CIBumpDistortionLinear", parameters: [
+            kCIInputCenterKey: CIVector(cgPoint: layers.lensPoint0),
+            kCIInputRadiusKey: layers.lensRadius * 1.45,
+            kCIInputAngleKey: CGFloat.pi * 0.035,
+            kCIInputScaleKey: 0.24
+        ])
+        let waveB = waveA.applyingFilter("CIBumpDistortionLinear", parameters: [
+            kCIInputCenterKey: CIVector(cgPoint: layers.lensPoint1),
+            kCIInputRadiusKey: layers.lensRadius * 1.30,
+            kCIInputAngleKey: CGFloat.pi * 0.965,
+            kCIInputScaleKey: -0.18
+        ])
+        let displaced = waveB.applyingFilter("CIDisplacementDistortion", parameters: [
             "inputDisplacementImage": layers.displacement,
             kCIInputScaleKey: layers.displacementScale
         ]).cropped(to: extent)
@@ -55,6 +70,23 @@ final class GlassRenderer: @unchecked Sendable {
             kCIInputBackgroundImageKey: source,
             kCIInputMaskImageKey: layers.mask
         ])
+        // Fine luminance edges from the underlying photo become reflections
+        // throughout the glass body, rather than a painted white haze.
+        let bodyEdges = displaced.applyingFilter("CIEdges", parameters: [
+            kCIInputIntensityKey: 1.25
+        ]).applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 0.085, y: 0, z: 0, w: 0),
+            "inputGVector": CIVector(x: 0, y: 0.085, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: 0.085, w: 0)
+        ])
+        let reflectedBodyCandidate = bodyEdges.applyingFilter("CIScreenBlendMode", parameters: [
+            kCIInputBackgroundImageKey: glass
+        ]).cropped(to: extent)
+        let reflectedBody = reflectedBodyCandidate.applyingFilter("CIBlendWithMask", parameters: [
+            kCIInputBackgroundImageKey: glass,
+            kCIInputMaskImageKey: layers.mask
+        ])
+
         // The physical rim reflects the actual pixels underneath it. Bright
         // and colourful areas therefore create stronger coloured highlights,
         // while dark areas stay subtle instead of receiving a painted line.
@@ -64,10 +96,10 @@ final class GlassRenderer: @unchecked Sendable {
             kCIInputContrastKey: 1.10
         ])
         let reflectedRim = liftedSource.applyingFilter("CIScreenBlendMode", parameters: [
-            kCIInputBackgroundImageKey: glass
+            kCIInputBackgroundImageKey: reflectedBody
         ]).cropped(to: extent)
         let opticallyRimmed = reflectedRim.applyingFilter("CIBlendWithMask", parameters: [
-            kCIInputBackgroundImageKey: glass,
+            kCIInputBackgroundImageKey: reflectedBody,
             kCIInputMaskImageKey: layers.rimMask
         ])
 
@@ -79,20 +111,23 @@ final class GlassRenderer: @unchecked Sendable {
         // its rim. The amount is deliberately subtle so it reads as coloured
         // refraction from the underlying photo instead of a painted overlay.
         let spectralOffset = max(min(extent.width, extent.height) * 0.00135, 0.65)
-        let red = source.applyingFilter("CIColorMatrix", parameters: [
-            "inputRVector": CIVector(x: 0.070, y: 0, z: 0, w: 0),
+        let spectralEdges = displaced.applyingFilter("CIEdges", parameters: [
+            kCIInputIntensityKey: 1.45
+        ])
+        let red = spectralEdges.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 0.22, y: 0, z: 0, w: 0),
             "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
             "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0)
         ]).transformed(by: CGAffineTransform(translationX: spectralOffset, y: 0))
-        let green = source.applyingFilter("CIColorMatrix", parameters: [
+        let green = spectralEdges.applyingFilter("CIColorMatrix", parameters: [
             "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0),
-            "inputGVector": CIVector(x: 0, y: 0.045, z: 0, w: 0),
+            "inputGVector": CIVector(x: 0, y: 0.12, z: 0, w: 0),
             "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0)
         ])
-        let blue = source.applyingFilter("CIColorMatrix", parameters: [
+        let blue = spectralEdges.applyingFilter("CIColorMatrix", parameters: [
             "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0),
             "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
-            "inputBVector": CIVector(x: 0, y: 0, z: 0.070, w: 0)
+            "inputBVector": CIVector(x: 0, y: 0, z: 0.22, w: 0)
         ]).transformed(by: CGAffineTransform(translationX: -spectralOffset, y: 0))
         let spectrum = red.applyingFilter("CIAdditionCompositing", parameters: [
             kCIInputBackgroundImageKey: green
