@@ -43,7 +43,7 @@ final class GlassRenderer: @unchecked Sendable {
             "inputPoint0": CIVector(cgPoint: layers.lensPoint0),
             "inputPoint1": CIVector(cgPoint: layers.lensPoint1),
             "inputRadius": layers.lensRadius,
-            "inputRefraction": 1.18
+            "inputRefraction": 1.10
         ])
         let displaced = refracted.applyingFilter("CIDisplacementDistortion", parameters: [
             "inputDisplacementImage": layers.displacement,
@@ -140,9 +140,9 @@ final class GlassRenderer: @unchecked Sendable {
             ctx.saveGState()
             path.addClip()
             let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-                UIColor.white.withAlphaComponent(0.075).cgColor,
-                UIColor.white.withAlphaComponent(0.012).cgColor,
-                UIColor.black.withAlphaComponent(0.025).cgColor
+                UIColor.white.withAlphaComponent(0.026).cgColor,
+                UIColor.white.withAlphaComponent(0.004).cgColor,
+                UIColor.black.withAlphaComponent(0.008).cgColor
             ] as CFArray, locations: [0, 0.52, 1])!
             ctx.drawLinearGradient(gradient,
                 start: CGPoint(x: rect.midX, y: rect.minY),
@@ -154,8 +154,8 @@ final class GlassRenderer: @unchecked Sendable {
             ctx.saveGState()
             path.addClip()
             let reflection = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-                UIColor.white.withAlphaComponent(0.20).cgColor,
-                UIColor.white.withAlphaComponent(0.045).cgColor,
+                UIColor.white.withAlphaComponent(0.16).cgColor,
+                UIColor.white.withAlphaComponent(0.028).cgColor,
                 UIColor.white.withAlphaComponent(0).cgColor
             ] as CFArray, locations: [0, 0.38, 1])!
             ctx.drawRadialGradient(reflection,
@@ -166,14 +166,21 @@ final class GlassRenderer: @unchecked Sendable {
                 options: [])
             ctx.restoreGState()
 
+            // One very thin highlight at the physical outer rim. Expanding
+            // the stroke path beyond the raster bounds keeps its inner half
+            // from reading as a second concentric rounded rectangle.
             ctx.saveGState()
-            ctx.addPath(path.cgPath)
-            ctx.setLineWidth(max(0.72 * scale, 0.6))
+            let rimWidth = max(0.95 * scale, 0.65)
+            let rimPath = UIBezierPath(roundedRect: rect.insetBy(dx: -rimWidth * 0.55,
+                                                                 dy: -rimWidth * 0.55),
+                                       cornerRadius: radius + rimWidth * 0.55)
+            ctx.addPath(rimPath.cgPath)
+            ctx.setLineWidth(rimWidth)
             ctx.replacePathWithStrokedPath()
             ctx.clip()
             let edgeHighlight = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-                UIColor.white.withAlphaComponent(0.34).cgColor,
-                UIColor.white.withAlphaComponent(0.09).cgColor,
+                UIColor.white.withAlphaComponent(0.38).cgColor,
+                UIColor.white.withAlphaComponent(0.12).cgColor,
                 UIColor.white.withAlphaComponent(0).cgColor,
                 UIColor.white.withAlphaComponent(0).cgColor
             ] as CFArray, locations: [0, 0.20, 0.50, 1])!
@@ -238,11 +245,11 @@ final class GlassRenderer: @unchecked Sendable {
         let overlay = overlayPanel.transformed(by: placement)
 
         return Layers(extent: extent, mask: mask, displacement: displacement,
-                      overlay: overlay, displacementScale: height * 0.18,
-                      blurRadius: max(height * 0.003, 0.22),
+                      overlay: overlay, displacementScale: height * 0.105,
+                      blurRadius: max(height * 0.0012, 0.10),
                       lensPoint0: CGPoint(x: rect.minX + radius, y: rect.midY),
                       lensPoint1: CGPoint(x: rect.maxX - radius, y: rect.midY),
-                      lensRadius: radius * 0.96)
+                      lensRadius: radius * 0.985)
     }
 
     private func raster(size: CGSize, opaque: Bool,

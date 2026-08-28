@@ -78,11 +78,24 @@ final class ShareViewController: UIViewController {
             guard authorized else { throw WatermarkError.photoPermissionDenied }
 
             let original = SharedAssetMatcher.find(photoURL: payload.photoURL,
-                                                   requiresLive: payload.videoURL != nil)
+                                                   requiresLive: payload.isLivePhoto)
+            if payload.isLivePhoto, original == nil, payload.videoURL == nil {
+                throw WatermarkError.livePhotoLibraryAccessRequired
+            }
             let saveMode = await chooseSaveMode(canReplace: original != nil)
             guard let saveMode else { throw CancellationError() }
 
-            if let movieURL = payload.videoURL {
+            if payload.isLivePhoto, let original {
+                await setStatus("正在读取 Live Photo 配对资源", progress: 0.12)
+                _ = try await LivePhotoProcessor.process(
+                    asset: original, selectedImageURL: payload.photoURL,
+                    metadata: metadata, maxStillDimension: 2048
+                ) { [weak self] value in
+                    Task { @MainActor in
+                        self?.setStatus("正在处理 Live Photo", progress: Float(0.12 + value * 0.86))
+                    }
+                }
+            } else if let movieURL = payload.videoURL {
                 await setStatus("正在重建 Live Photo", progress: 0.12)
                 _ = try await LivePhotoProcessor.process(
                     sharedPhotoURL: payload.photoURL, pairedVideoURL: movieURL,
@@ -151,6 +164,7 @@ final class ShareViewController: UIViewController {
 private struct SharedPhotoPayload {
     let photoURL: URL
     let videoURL: URL?
+    let isLivePhoto: Bool
 }
 
 private enum SharedPhotoLoader {
@@ -158,6 +172,9 @@ private enum SharedPhotoLoader {
         guard !providers.isEmpty else { throw WatermarkError.assetUnavailable }
         var photoURL: URL?
         var videoURL: URL?
+        let advertisedLive = providers.contains {
+            $0.hasItemConformingToTypeIdentifier(UTType.livePhoto.identifier)
+        }
 
         // Some Photos versions expose a Live Photo as a file package instead
         // of separate image/movie representations.
@@ -194,7 +211,8 @@ private enum SharedPhotoLoader {
             }
         }
         guard let photoURL else { throw WatermarkError.assetUnavailable }
-        return SharedPhotoPayload(photoURL: photoURL, videoURL: videoURL)
+        return SharedPhotoPayload(photoURL: photoURL, videoURL: videoURL,
+                                  isLivePhoto: advertisedLive || videoURL != nil)
     }
 
     private static func pairInsidePackage(_ url: URL) -> (photo: URL, video: URL)? {

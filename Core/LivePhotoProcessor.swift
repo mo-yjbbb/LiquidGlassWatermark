@@ -6,6 +6,7 @@ import UIKit
 enum LivePhotoProcessor {
     @discardableResult
     static func process(asset: PHAsset?, selectedImageURL: URL, metadata: WatermarkMetadata,
+                        maxStillDimension: CGFloat = 4096,
                         progress: @escaping @Sendable (Double) -> Void) async throws -> String {
         let work = FileManager.default.temporaryDirectory.appendingPathComponent("LGW-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
@@ -29,7 +30,8 @@ enum LivePhotoProcessor {
         let renderedPhoto = work.appendingPathComponent("rendered.jpg")
         let renderedVideo = work.appendingPathComponent("rendered.mov")
         let renderer = GlassRenderer(metadata: metadata)
-        try renderStill(sourcePhoto, to: renderedPhoto, renderer: renderer)
+        try renderStill(sourcePhoto, to: renderedPhoto, renderer: renderer,
+                        maxDimension: maxStillDimension)
         progress(0.12)
         try await renderVideo(sourceVideo, to: renderedVideo, renderer: renderer) {
             progress(0.12 + $0 * 0.68)
