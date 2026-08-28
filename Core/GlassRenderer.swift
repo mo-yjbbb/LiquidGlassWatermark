@@ -235,7 +235,7 @@ final class GlassRenderer: @unchecked Sendable {
             // Two independent horizontal hairline reflections. They stop and
             // fade before the rounded corners, so this can never read as a
             // closed outline. No shadow, blur, or outer glow is used.
-            let hairline = max(0.54 * scale, 0.44)
+            let hairline = max(1.05 * scale, 0.82)
             let lineInset = max(radius * 0.78, height * 0.34)
             let lineMinX = rect.minX + lineInset
             let lineMaxX = rect.maxX - lineInset
