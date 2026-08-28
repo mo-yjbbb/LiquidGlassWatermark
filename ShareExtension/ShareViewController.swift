@@ -85,9 +85,10 @@ final class ShareViewController: UIViewController {
             let saveMode = await chooseSaveMode(canReplace: original != nil)
             guard let saveMode else { throw CancellationError() }
 
+            let newIdentifier: String
             if payload.isLivePhoto, let original {
                 await setStatus("正在读取 Live Photo 配对资源", progress: 0.12)
-                _ = try await LivePhotoProcessor.process(
+                newIdentifier = try await LivePhotoProcessor.process(
                     asset: original, selectedImageURL: payload.photoURL,
                     metadata: metadata, maxStillDimension: 2048
                 ) { [weak self] value in
@@ -97,7 +98,7 @@ final class ShareViewController: UIViewController {
                 }
             } else if let movieURL = payload.videoURL {
                 await setStatus("正在重建 Live Photo", progress: 0.12)
-                _ = try await LivePhotoProcessor.process(
+                newIdentifier = try await LivePhotoProcessor.process(
                     sharedPhotoURL: payload.photoURL, pairedVideoURL: movieURL,
                     metadata: metadata, creationDate: original?.creationDate,
                     location: original?.location, maxStillDimension: 2048
@@ -108,17 +109,22 @@ final class ShareViewController: UIViewController {
                 }
             } else {
                 await setStatus("正在渲染照片", progress: 0.35)
-                _ = try await StillPhotoProcessor.process(imageURL: payload.photoURL,
+                newIdentifier = try await StillPhotoProcessor.process(imageURL: payload.photoURL,
                                                       asset: original, metadata: metadata,
                                                       maxDimension: 2048)
             }
+            await setStatus("正在确认图库结果", progress: 0.96)
+            try await SharedSaveVerifier.verifyAndFile(identifier: newIdentifier,
+                                                        requiresLive: payload.isLivePhoto)
             if saveMode == .replaceOriginal, let original {
                 await setStatus("正在替换原图", progress: 0.98)
                 try await PHPhotoLibrary.shared().performChanges {
                     PHAssetChangeRequest.deleteAssets([original] as NSArray)
                 }
             }
-            await setStatus(payload.videoURL == nil ? "已保存带水印照片" : "已保存带水印 Live Photo",
+            await setStatus(payload.isLivePhoto
+                            ? "已保存到“液态玻璃水印”相簿（Live Photo）"
+                            : "已保存到“液态玻璃水印”相簿",
                             progress: 1)
             try? await Task.sleep(for: .milliseconds(650))
             extensionContext?.completeRequest(returningItems: nil)
@@ -269,5 +275,56 @@ private enum SharedAssetMatcher {
             }
         }
         return match
+    }
+}
+
+private enum SharedSaveVerifier {
+    private static let albumName = "液态玻璃水印"
+
+    static func verifyAndFile(identifier: String, requiresLive: Bool) async throws {
+        let asset = try await waitForAsset(identifier: identifier, requiresLive: requiresLive)
+        let album = try await fetchOrCreateAlbum()
+        try await PHPhotoLibrary.shared().performChanges {
+            guard let request = PHAssetCollectionChangeRequest(for: album) else { return }
+            request.addAssets([asset] as NSArray)
+        }
+        // Confirm album membership as well; success must mean the result is
+        // discoverable, not merely that Photos accepted a change request.
+        let options = PHFetchOptions()
+        options.predicate = NSPredicate(format: "localIdentifier == %@", identifier)
+        guard PHAsset.fetchAssets(in: album, options: options).firstObject != nil else {
+            throw WatermarkError.livePhotoValidationFailed
+        }
+    }
+
+    private static func waitForAsset(identifier: String, requiresLive: Bool) async throws -> PHAsset {
+        for attempt in 0..<12 {
+            if let asset = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject {
+                if !requiresLive { return asset }
+                let resources = PHAssetResource.assetResources(for: asset)
+                let hasPhoto = resources.contains { $0.type == .photo || $0.type == .fullSizePhoto }
+                let hasVideo = resources.contains { $0.type == .pairedVideo || $0.type == .fullSizePairedVideo }
+                if asset.mediaSubtypes.contains(.photoLive), hasPhoto, hasVideo { return asset }
+            }
+            if attempt < 11 { try await Task.sleep(for: .milliseconds(350 + attempt * 120)) }
+        }
+        throw WatermarkError.livePhotoValidationFailed
+    }
+
+    private static func fetchOrCreateAlbum() async throws -> PHAssetCollection {
+        let options = PHFetchOptions()
+        options.predicate = NSPredicate(format: "localizedTitle == %@", albumName)
+        if let existing = PHAssetCollection.fetchAssetCollections(with: .album,
+                subtype: .albumRegular, options: options).firstObject { return existing }
+        var identifier: String?
+        try await PHPhotoLibrary.shared().performChanges {
+            identifier = PHAssetCollectionChangeRequest
+                .creationRequestForAssetCollection(withTitle: albumName)
+                .placeholderForCreatedAssetCollection.localIdentifier
+        }
+        guard let identifier,
+              let album = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [identifier],
+                    options: nil).firstObject else { throw WatermarkError.renderFailed }
+        return album
     }
 }
