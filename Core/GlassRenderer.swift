@@ -54,13 +54,13 @@ final class GlassRenderer: @unchecked Sendable {
             kCIInputCenterKey: CIVector(cgPoint: layers.lensPoint0),
             kCIInputRadiusKey: layers.lensRadius * 1.45,
             kCIInputAngleKey: CGFloat.pi * 0.035,
-            kCIInputScaleKey: 0.24
+            kCIInputScaleKey: 0.42
         ])
         let waveB = waveA.applyingFilter("CIBumpDistortionLinear", parameters: [
             kCIInputCenterKey: CIVector(cgPoint: layers.lensPoint1),
             kCIInputRadiusKey: layers.lensRadius * 1.30,
             kCIInputAngleKey: CGFloat.pi * 0.965,
-            kCIInputScaleKey: -0.18
+            kCIInputScaleKey: -0.32
         ])
         let displaced = waveB.applyingFilter("CIDisplacementDistortion", parameters: [
             "inputDisplacementImage": layers.displacement,
@@ -249,28 +249,9 @@ final class GlassRenderer: @unchecked Sendable {
             let rect = panelRect
             let ctx = renderer.cgContext
             let path = UIBezierPath(roundedRect: rect, cornerRadius: radius)
-            // Almost-clear optical base. This is a uniform tint rather than a
-            // white gradient, and exists only to keep glass readable on black.
-            UIColor.white.withAlphaComponent(0.012).setFill()
-            path.fill()
             // Transparent optical reflections cover the complete capsule.
             // These are highlights only (no translucent fill), so the centre
             // keeps the same clarity while still reading as curved glass.
-            ctx.saveGState()
-            path.addClip()
-            ctx.setBlendMode(.screen)
-            // A very soft travelling specular band gives the middle of the
-            // lens a liquid response without turning it milky.
-            let specular = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-                UIColor.white.withAlphaComponent(0).cgColor,
-                UIColor.white.withAlphaComponent(0.052).cgColor,
-                UIColor.white.withAlphaComponent(0).cgColor
-            ] as CFArray, locations: [0, 0.5, 1])!
-            ctx.drawLinearGradient(specular,
-                start: CGPoint(x: rect.minX + rect.width * 0.18, y: rect.minY),
-                end: CGPoint(x: rect.maxX - rect.width * 0.18, y: rect.maxY), options: [])
-            ctx.restoreGState()
-
             // Two independent horizontal hairline reflections. They stop and
             // fade before the rounded corners, so this can never read as a
             // closed outline. No shadow, blur, or outer glow is used.
@@ -354,7 +335,7 @@ final class GlassRenderer: @unchecked Sendable {
         let overlay = overlayPanel.transformed(by: placement)
 
         return Layers(extent: extent, mask: mask, rimMask: rimMask, displacement: displacement,
-                      overlay: overlay, displacementScale: height * 0.265,
+                      overlay: overlay, displacementScale: height * 0.38,
                       blurRadius: 0,
                       lensPoint0: CGPoint(x: rect.minX + radius, y: rect.midY),
                       lensPoint1: CGPoint(x: rect.maxX - radius, y: rect.midY),
