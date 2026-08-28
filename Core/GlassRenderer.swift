@@ -235,34 +235,34 @@ final class GlassRenderer: @unchecked Sendable {
             // Two independent horizontal hairline reflections. They stop and
             // fade before the rounded corners, so this can never read as a
             // closed outline. No shadow, blur, or outer glow is used.
-            let hairline = max(0.756 * scale, 0.62)
-            let lineInset = max(radius * 0.78, height * 0.34)
-            let lineMinX = rect.minX + lineInset
-            let lineMaxX = rect.maxX - lineInset
+            let hairline = max(0.81 * scale, 0.66)
             let horizontalLight = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-                UIColor.white.withAlphaComponent(0).cgColor,
+                UIColor.white.withAlphaComponent(0.13).cgColor,
                 UIColor.white.withAlphaComponent(0.22).cgColor,
                 UIColor.white.withAlphaComponent(0.38).cgColor,
                 UIColor.white.withAlphaComponent(0.22).cgColor,
-                UIColor.white.withAlphaComponent(0).cgColor
+                UIColor.white.withAlphaComponent(0.13).cgColor
             ] as CFArray, locations: [0, 0.10, 0.50, 0.90, 1])!
-
-            func drawHorizontalHairline(at y: CGFloat) {
-                ctx.saveGState()
-                ctx.move(to: CGPoint(x: lineMinX, y: y))
-                ctx.addLine(to: CGPoint(x: lineMaxX, y: y))
-                ctx.setLineWidth(hairline)
-                ctx.setLineCap(.butt)
-                ctx.replacePathWithStrokedPath()
-                ctx.clip()
-                ctx.drawLinearGradient(horizontalLight,
-                    start: CGPoint(x: lineMinX, y: y),
-                    end: CGPoint(x: lineMaxX, y: y), options: [])
-                ctx.restoreGState()
-            }
-
-            drawHorizontalHairline(at: rect.minY + hairline * 0.5)
-            drawHorizontalHairline(at: rect.maxY - hairline * 0.5)
+            ctx.saveGState()
+            let edge = UIBezierPath(roundedRect: rect.insetBy(dx: hairline * 0.5,
+                                                              dy: hairline * 0.5),
+                                    cornerRadius: radius - hairline * 0.5)
+            ctx.addPath(edge.cgPath)
+            ctx.setLineWidth(hairline)
+            ctx.replacePathWithStrokedPath()
+            ctx.clip()
+            // Keep the top/bottom runs plus only the first part of each arc;
+            // the vertical side centres remain completely transparent.
+            ctx.clip(to: [
+                CGRect(x: rect.minX, y: rect.minY,
+                       width: rect.width, height: radius * 0.34),
+                CGRect(x: rect.minX, y: rect.maxY - radius * 0.34,
+                       width: rect.width, height: radius * 0.34)
+            ])
+            ctx.drawLinearGradient(horizontalLight,
+                start: CGPoint(x: rect.minX, y: rect.midY),
+                end: CGPoint(x: rect.maxX, y: rect.midY), options: [])
+            ctx.restoreGState()
 
             let horizontalPadding = height * 0.34
             let leftX = rect.minX + horizontalPadding
