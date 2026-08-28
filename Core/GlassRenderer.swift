@@ -232,18 +232,28 @@ final class GlassRenderer: @unchecked Sendable {
                 end: CGPoint(x: rect.maxX - rect.width * 0.18, y: rect.maxY), options: [])
             ctx.restoreGState()
 
-            // Exactly one hairline highlight on the physical boundary. The
-            // path sits mostly outside the raster, so it cannot form an inset
-            // or a second rounded rectangle.
+            // Two hairline reflections at the physical top and bottom edges.
+            // The side midpoint is transparent: this is not an outline and
+            // no blur or outer glow is applied.
             ctx.saveGState()
             let hairline = max(0.62 * scale, 0.48)
             let edge = UIBezierPath(roundedRect: rect.insetBy(dx: -hairline * 0.60,
                                                               dy: -hairline * 0.60),
                                     cornerRadius: radius + hairline * 0.60)
             ctx.addPath(edge.cgPath)
-            ctx.setStrokeColor(UIColor.white.withAlphaComponent(0.34).cgColor)
             ctx.setLineWidth(hairline)
-            ctx.strokePath()
+            ctx.replacePathWithStrokedPath()
+            ctx.clip()
+            let hairlineLight = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
+                UIColor.white.withAlphaComponent(0.40).cgColor,
+                UIColor.white.withAlphaComponent(0.06).cgColor,
+                UIColor.white.withAlphaComponent(0).cgColor,
+                UIColor.white.withAlphaComponent(0.05).cgColor,
+                UIColor.white.withAlphaComponent(0.30).cgColor
+            ] as CFArray, locations: [0, 0.16, 0.48, 0.84, 1])!
+            ctx.drawLinearGradient(hairlineLight,
+                start: CGPoint(x: rect.midX, y: rect.minY),
+                end: CGPoint(x: rect.midX, y: rect.maxY), options: [])
             ctx.restoreGState()
 
             let horizontalPadding = height * 0.34
@@ -382,11 +392,11 @@ private func brandMark(for device: String) -> BrandMark {
 
 private func brandAspectRatio(_ mark: BrandMark) -> CGFloat {
     switch mark {
-    case .apple, .leica, .hasselblad, .camera: return 1
+    case .apple, .leica, .camera, .honor: return 1
+    case .hasselblad: return 1.28
     case .zeiss: return 1.05
     case .xmage: return 1.9
     case .iqoo: return 2.05
-    case .honor: return 2.4
     case .word(let text, _): return max(0.8, min(CGFloat(text.count) * 0.62, 2.5))
     }
 }
@@ -420,11 +430,9 @@ private func drawBrandMark(_ mark: BrandMark, in rect: CGRect, context ctx: CGCo
         centeredText("XMAGE", font: font,
                      color: UIColor(red: 0.78, green: 0, blue: 0.16, alpha: 1))
     case .hasselblad:
-        let diameter = min(rect.width, rect.height) * 0.96
-        let badge = CGRect(x: rect.midX - diameter * 0.5, y: rect.midY - diameter * 0.5,
-                           width: diameter, height: diameter)
-        UIColor.black.withAlphaComponent(0.88).setFill()
-        UIBezierPath(ovalIn: badge).fill()
+        let badge = CGRect(x: rect.midX - rect.height * 0.42,
+                           y: rect.minY + rect.height * 0.02,
+                           width: rect.height * 0.84, height: rect.height * 0.66)
         func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
             CGPoint(x: badge.minX + badge.width * x, y: badge.minY + badge.height * y)
         }
@@ -438,6 +446,13 @@ private func drawBrandMark(_ mark: BrandMark, in rect: CGRect, context ctx: CGCo
         let bridge = UIBezierPath()
         bridge.move(to: point(0.27, 0.46)); bridge.addLine(to: point(0.68, 0.46))
         bridge.addLine(to: point(0.65, 0.59)); bridge.addLine(to: point(0.24, 0.59)); bridge.close(); bridge.fill()
+        let word = "HASSELBLAD"
+        let wordFont = UIFont.systemFont(ofSize: rect.height * 0.105, weight: .medium)
+        let wordSize = (word as NSString).size(withAttributes: [.font: wordFont])
+        (word as NSString).draw(at: CGPoint(x: rect.midX - wordSize.width * 0.5,
+                                            y: rect.maxY - wordSize.height * 1.12),
+                                withAttributes: [.font: wordFont,
+                                                 .foregroundColor: UIColor.white])
     case .zeiss:
         let badge = rect.insetBy(dx: rect.width * 0.04, dy: rect.height * 0.04)
         let path = UIBezierPath()
@@ -449,33 +464,24 @@ private func drawBrandMark(_ mark: BrandMark, in rect: CGRect, context ctx: CGCo
         path.close()
         UIColor(red: 0.10, green: 0.18, blue: 0.62, alpha: 1).setFill()
         path.fill()
-        centeredText("ZEISS", font: UIFont.systemFont(ofSize: rect.height * 0.34,
-                                                       weight: .bold), color: .white)
+        centeredText("ZEISS", font: UIFont(name: "Georgia-Bold", size: rect.height * 0.32)
+                     ?? UIFont.systemFont(ofSize: rect.height * 0.32, weight: .bold), color: .white)
     case .iqoo:
         centeredText("iQOO", font: UIFont.systemFont(ofSize: rect.height * 0.54,
                                                       weight: .medium),
                      color: UIColor(red: 0.96, green: 0.66, blue: 0.02, alpha: 1))
     case .honor:
-        let iconSize = rect.height * 0.72
-        let icon = CGRect(x: rect.minX, y: rect.midY - iconSize * 0.5,
+        let iconSize = rect.height * 0.84
+        let icon = CGRect(x: rect.midX - iconSize * 0.5, y: rect.midY - iconSize * 0.5,
                           width: iconSize, height: iconSize)
         ctx.setStrokeColor(UIColor.white.cgColor)
         ctx.setLineWidth(max(iconSize * 0.16, 1))
         ctx.setLineCap(.butt)
-        for start in stride(from: CGFloat.pi * 0.08, to: CGFloat.pi * 2, by: CGFloat.pi * 0.5) {
-            ctx.addArc(center: CGPoint(x: icon.midX, y: icon.midY),
-                       radius: iconSize * 0.36, startAngle: start,
-                       endAngle: start + CGFloat.pi * 0.34, clockwise: false)
-        }
+        ctx.addArc(center: CGPoint(x: icon.midX, y: icon.midY), radius: iconSize * 0.36,
+                   startAngle: -.pi * 0.14, endAngle: .pi * 0.72, clockwise: false)
+        ctx.addArc(center: CGPoint(x: icon.midX, y: icon.midY), radius: iconSize * 0.36,
+                   startAngle: .pi * 0.86, endAngle: .pi * 1.72, clockwise: false)
         ctx.strokePath()
-        let wordRect = CGRect(x: icon.maxX + rect.height * 0.08, y: rect.minY,
-                              width: max(rect.maxX - icon.maxX - rect.height * 0.08, 1),
-                              height: rect.height)
-        let font = UIFont.systemFont(ofSize: rect.height * 0.34, weight: .semibold)
-        let size = ("HONOR" as NSString).size(withAttributes: [.font: font])
-        ("HONOR" as NSString).draw(at: CGPoint(x: wordRect.midX - size.width * 0.5,
-                                               y: wordRect.midY - size.height * 0.5),
-                                    withAttributes: [.font: font, .foregroundColor: UIColor.white])
     case .word(let text, let weight):
         let size = fittedFontSize(text, base: rect.height * 0.52,
                                   minimum: rect.height * 0.27,
@@ -487,4 +493,3 @@ private func drawBrandMark(_ mark: BrandMark, in rect: CGRect, context ctx: CGCo
     }
 }
 }
-
