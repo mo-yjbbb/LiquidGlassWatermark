@@ -249,6 +249,10 @@ final class GlassRenderer: @unchecked Sendable {
             let rect = panelRect
             let ctx = renderer.cgContext
             let path = UIBezierPath(roundedRect: rect, cornerRadius: radius)
+            // Uniform 3% white optical base requested for glass separation.
+            // It is deliberately flat: no white gradient, blur, or haze.
+            UIColor.white.withAlphaComponent(0.03).setFill()
+            path.fill()
             // Transparent optical reflections cover the complete capsule.
             // These are highlights only (no translucent fill), so the centre
             // keeps the same clarity while still reading as curved glass.
