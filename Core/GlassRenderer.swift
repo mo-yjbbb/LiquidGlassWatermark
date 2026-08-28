@@ -342,7 +342,7 @@ private func brandMark(for device: String) -> (text: String, weight: UIFont.Weig
     if value.contains("xiaomi") || value.contains("redmi") || value.contains("poco") {
         return ("Leica", .semibold)
     }
-    if value.contains("huawei") { return ("HUAWEI", .semibold) }
+    if value.contains("huawei") { return ("XMAGE", .bold) }
     if value.contains("honor") { return ("HONOR", .semibold) }
     if value.contains("oneplus") || value.contains("one plus") || value.contains("oppo") {
         return ("HASSELBLAD", .semibold)
