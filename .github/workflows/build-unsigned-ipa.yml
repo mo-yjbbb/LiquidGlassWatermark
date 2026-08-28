@@ -84,10 +84,20 @@ jobs:
               exit 1
             fi
           done
+      - name: Sign importable Shortcut
+        run: |
+          set -euo pipefail
+          /usr/bin/shortcuts sign \
+            --mode anyone \
+            --input "Shortcuts/液态玻璃水印.shortcut" \
+            --output "LiquidGlassWatermark.shortcut"
+          test -s LiquidGlassWatermark.shortcut
       - uses: actions/upload-artifact@v4
         with:
           name: LiquidGlassWatermark-signer-compatible
           path: |
             LiquidGlassWatermark-clean.ipa
             LiquidGlassWatermark-adhoc.ipa
+            LiquidGlassWatermark.shortcut
             TestAttachments
+
