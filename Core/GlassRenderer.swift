@@ -258,11 +258,13 @@ final class GlassRenderer: @unchecked Sendable {
             let hairline = max(0.81 * scale, 0.66)
             let edgeLight = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
                 UIColor.white.withAlphaComponent(0.58).cgColor,
+                UIColor.white.withAlphaComponent(0.20).cgColor,
+                UIColor.white.withAlphaComponent(0.08).cgColor,
                 UIColor.white.withAlphaComponent(0).cgColor,
-                UIColor.white.withAlphaComponent(0).cgColor,
-                UIColor.white.withAlphaComponent(0).cgColor,
+                UIColor.white.withAlphaComponent(0.08).cgColor,
+                UIColor.white.withAlphaComponent(0.18).cgColor,
                 UIColor.white.withAlphaComponent(0.52).cgColor
-            ] as CFArray, locations: [0, 0.17, 0.50, 0.83, 1])!
+            ] as CFArray, locations: [0, 0.13, 0.30, 0.50, 0.70, 0.87, 1])!
             ctx.saveGState()
             let edge = UIBezierPath(roundedRect: rect.insetBy(dx: hairline * 0.5,
                                                               dy: hairline * 0.5),
