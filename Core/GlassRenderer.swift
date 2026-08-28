@@ -168,12 +168,12 @@ final class GlassRenderer: @unchecked Sendable {
 
             ctx.saveGState()
             ctx.addPath(path.cgPath)
-            ctx.setLineWidth(max(1.35 * scale, 1))
+            ctx.setLineWidth(max(0.72 * scale, 0.6))
             ctx.replacePathWithStrokedPath()
             ctx.clip()
             let edgeHighlight = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
-                UIColor.white.withAlphaComponent(0.62).cgColor,
-                UIColor.white.withAlphaComponent(0.18).cgColor,
+                UIColor.white.withAlphaComponent(0.34).cgColor,
+                UIColor.white.withAlphaComponent(0.09).cgColor,
                 UIColor.white.withAlphaComponent(0).cgColor,
                 UIColor.white.withAlphaComponent(0).cgColor
             ] as CFArray, locations: [0, 0.20, 0.50, 1])!
@@ -282,4 +282,3 @@ private func fittedFontSize(_ text: String, base: CGFloat, minimum: CGFloat,
     return max(minimum, base * maxWidth / width)
 }
 }
-

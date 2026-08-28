@@ -3,13 +3,14 @@ import Photos
 
 @MainActor
 final class WatermarkModel: ObservableObject {
+    enum SaveMode { case newCopy, replaceOriginal }
     @Published var isWorking = false
     @Published var progress = 0.0
     @Published var status = "准备中"
     @Published var resultMessage: String?
     @Published var didSucceed = false
 
-    func process(selection: PickedPhoto) async {
+    func process(selection: PickedPhoto, saveMode: SaveMode) async {
         isWorking = true
         progress = 0.05
         status = "读取照片"
@@ -41,7 +42,7 @@ final class WatermarkModel: ObservableObject {
             if actualIsLive {
                 status = "重建标准 Live Photo"
                 progress = 0.15
-                try await LivePhotoProcessor.process(asset: asset,
+                _ = try await LivePhotoProcessor.process(asset: asset,
                                                      selectedImageURL: selection.imageURL,
                                                      metadata: metadata) { [weak self] value in
                     Task { @MainActor in self?.progress = 0.15 + value * 0.8 }
@@ -50,9 +51,16 @@ final class WatermarkModel: ObservableObject {
             } else {
                 status = "渲染照片"
                 progress = 0.4
-                try await StillPhotoProcessor.process(imageURL: selection.imageURL,
+                _ = try await StillPhotoProcessor.process(imageURL: selection.imageURL,
                                                       asset: asset, metadata: metadata)
                 resultMessage = "已保存新的带水印照片"
+            }
+            if saveMode == .replaceOriginal, let asset {
+                status = "替换原图"
+                try await PHPhotoLibrary.shared().performChanges {
+                    PHAssetChangeRequest.deleteAssets([asset] as NSArray)
+                }
+                resultMessage = actualIsLive ? "已用带水印 Live Photo 替换原图" : "已用带水印照片替换原图"
             }
             progress = 1
             status = "完成"
@@ -92,4 +100,3 @@ enum PhotoAccess {
             : (status == .authorized || status == .limited)
     }
 }
-

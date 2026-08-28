@@ -4,8 +4,9 @@ import AVFoundation
 import UIKit
 
 enum LivePhotoProcessor {
+    @discardableResult
     static func process(asset: PHAsset?, selectedImageURL: URL, metadata: WatermarkMetadata,
-                        progress: @escaping @Sendable (Double) -> Void) async throws {
+                        progress: @escaping @Sendable (Double) -> Void) async throws -> String {
         let work = FileManager.default.temporaryDirectory.appendingPathComponent("LGW-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
         var externalTemporaryFiles: [URL] = []
@@ -43,15 +44,18 @@ enum LivePhotoProcessor {
                                         creationDate: asset?.creationDate, location: asset?.location)
         try await verifySavedLivePhoto(localIdentifier: identifier)
         progress(1)
+        return identifier
     }
 
     /// Entry point used by the Photos share extension. The extension receives
     /// the still and paired movie from the share sheet, so it must never route
     /// the item through the single-image/motion-photo fallback.
+    @discardableResult
     static func process(sharedPhotoURL: URL, pairedVideoURL: URL,
                         metadata: WatermarkMetadata,
                         creationDate: Date? = nil, location: CLLocation? = nil,
-                        progress: @escaping @Sendable (Double) -> Void) async throws {
+                        maxStillDimension: CGFloat = 2048,
+                        progress: @escaping @Sendable (Double) -> Void) async throws -> String {
         let work = FileManager.default.temporaryDirectory
             .appendingPathComponent("LGW-Share-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
@@ -60,7 +64,8 @@ enum LivePhotoProcessor {
         let renderedPhoto = work.appendingPathComponent("rendered.jpg")
         let renderedVideo = work.appendingPathComponent("rendered.mov")
         let renderer = GlassRenderer(metadata: metadata)
-        try renderStill(sharedPhotoURL, to: renderedPhoto, renderer: renderer)
+        try renderStill(sharedPhotoURL, to: renderedPhoto, renderer: renderer,
+                        maxDimension: maxStillDimension)
         progress(0.12)
         try await renderVideo(pairedVideoURL, to: renderedVideo, renderer: renderer) {
             progress(0.12 + $0 * 0.68)
@@ -76,6 +81,7 @@ enum LivePhotoProcessor {
                                         creationDate: creationDate, location: location)
         try await verifySavedLivePhoto(localIdentifier: identifier)
         progress(1)
+        return identifier
     }
 
     private static func matchedResources(for asset: PHAsset) throws
@@ -89,12 +95,13 @@ enum LivePhotoProcessor {
     }
 
     private static func renderStill(_ sourceURL: URL, to outputURL: URL,
-                                    renderer: GlassRenderer) throws {
+                                    renderer: GlassRenderer,
+                                    maxDimension: CGFloat = 4096) throws {
         guard let original = CIImage(contentsOf: sourceURL, options: [.applyOrientationProperty: true]) else {
             throw WatermarkError.renderFailed
         }
         let longest = max(original.extent.width, original.extent.height)
-        let scale = min(1, 4096 / max(longest, 1))
+        let scale = min(1, maxDimension / max(longest, 1))
         let source = scale < 1
             ? original.applyingFilter("CILanczosScaleTransform", parameters: [
                 kCIInputScaleKey: scale,

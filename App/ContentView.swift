@@ -6,6 +6,8 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @StateObject private var model = WatermarkModel()
     @State private var showingPicker = false
+    @State private var pendingSelection: PickedPhoto?
+    @State private var showingSaveChoice = false
 
     var body: some View {
         NavigationStack {
@@ -55,10 +57,28 @@ struct ContentView: View {
                 AssetPicker { selection in
                     showingPicker = false
                     guard let selection else { return }
-                    Task { await model.process(selection: selection) }
+                    pendingSelection = selection
+                    showingSaveChoice = true
                 }
             }
+            .confirmationDialog("如何保存处理结果？", isPresented: $showingSaveChoice,
+                                titleVisibility: .visible) {
+                Button("保存为新照片") { processPending(.newCopy) }
+                Button("覆盖原图", role: .destructive) { processPending(.replaceOriginal) }
+                Button("取消", role: .cancel) {
+                    if let url = pendingSelection?.imageURL { try? FileManager.default.removeItem(at: url) }
+                    pendingSelection = nil
+                }
+            } message: {
+                Text("覆盖原图会在确认新照片完整保存后删除原始照片。")
+            }
         }
+    }
+
+    private func processPending(_ mode: WatermarkModel.SaveMode) {
+        guard let selection = pendingSelection else { return }
+        pendingSelection = nil
+        Task { await model.process(selection: selection, saveMode: mode) }
     }
 }
 
@@ -138,4 +158,3 @@ private struct AssetPicker: UIViewControllerRepresentable {
         }
     }
 }
-
