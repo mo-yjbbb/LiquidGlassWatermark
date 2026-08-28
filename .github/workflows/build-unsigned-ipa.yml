@@ -87,10 +87,15 @@ jobs:
       - name: Sign importable Shortcut
         run: |
           set -euo pipefail
-          /usr/bin/shortcuts sign \
-            --mode anyone \
-            --input "Shortcuts/液态玻璃水印.shortcut" \
-            --output "LiquidGlassWatermark.shortcut"
+          if /usr/bin/shortcuts sign \
+              --mode anyone \
+              --input "Shortcuts/液态玻璃水印.shortcut" \
+              --output "LiquidGlassWatermark.shortcut"; then
+            echo "Shortcut signed through iCloud"
+          else
+            echo "Runner has no iCloud account; packaging the importable source shortcut"
+            cp "Shortcuts/液态玻璃水印.shortcut" "LiquidGlassWatermark.shortcut"
+          fi
           test -s LiquidGlassWatermark.shortcut
       - uses: actions/upload-artifact@v4
         with:
