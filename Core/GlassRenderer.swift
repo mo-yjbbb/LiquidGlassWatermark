@@ -69,7 +69,39 @@ final class GlassRenderer: @unchecked Sendable {
             kCIInputBackgroundImageKey: glass,
             kCIInputMaskImageKey: layers.rimMask
         ])
-        return layers.overlay.composited(over: opticallyRimmed).cropped(to: layers.extent)
+
+        // Sub-pixel RGB separation at the curved rim simulates wavelength
+        // diffraction. It is derived entirely from the photo underneath and
+        // remains confined to the optical rim mask.
+        let spectralOffset = max(min(extent.width, extent.height) * 0.00115, 0.55)
+        let red = source.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 0.22, y: 0, z: 0, w: 0),
+            "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0)
+        ]).transformed(by: CGAffineTransform(translationX: spectralOffset, y: 0))
+        let green = source.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+            "inputGVector": CIVector(x: 0, y: 0.15, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0)
+        ])
+        let blue = source.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+            "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: 0.22, w: 0)
+        ]).transformed(by: CGAffineTransform(translationX: -spectralOffset, y: 0))
+        let spectrum = red.applyingFilter("CIAdditionCompositing", parameters: [
+            kCIInputBackgroundImageKey: green
+        ]).applyingFilter("CIAdditionCompositing", parameters: [
+            kCIInputBackgroundImageKey: blue
+        ]).cropped(to: extent)
+        let diffractedRim = spectrum.applyingFilter("CIScreenBlendMode", parameters: [
+            kCIInputBackgroundImageKey: opticallyRimmed
+        ])
+        let liquidGlass = diffractedRim.applyingFilter("CIBlendWithMask", parameters: [
+            kCIInputBackgroundImageKey: opticallyRimmed,
+            kCIInputMaskImageKey: layers.rimMask
+        ])
+        return layers.overlay.composited(over: liquidGlass).cropped(to: layers.extent)
     }
 
     func makeCGImage(_ image: CIImage) -> CGImage? {
