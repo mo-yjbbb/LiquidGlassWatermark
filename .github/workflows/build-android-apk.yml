@@ -24,7 +24,7 @@ jobs:
           gradle-version: "9.3.1"
       - name: Build APK
         working-directory: Android
-        run: gradle --no-daemon :app:testReleaseUnitTest :app:assembleRelease :app:assembleDebug
+        run: gradle --no-daemon :app:test :app:assembleRelease :app:assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: LiquidGlassWatermark-Android-Xiaomi
