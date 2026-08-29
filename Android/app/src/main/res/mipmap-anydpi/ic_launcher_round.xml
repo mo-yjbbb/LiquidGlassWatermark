@@ -24,7 +24,7 @@
     <!-- 液态玻璃水滴主体 -->
     <path android:pathData="M54,26 C64,41 78,47 78,62 A24,24 0 1,1 30,62 C30,47 44,41 54,26 Z">
         <aapt:attr name="android:fillColor">
-            <gradient android:type="linear" android:angle="90"
+            <gradient android:type="linear" android:angle="270"
                 android:startColor="#F5FFFFFF" android:centerColor="#C4FFFFFF" android:endColor="#40FFFFFF"/>
         </aapt:attr>
     </path>

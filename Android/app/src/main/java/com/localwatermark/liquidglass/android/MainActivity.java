@@ -169,6 +169,7 @@ public final class MainActivity extends Activity {
                 if (hasMediaLocationPermission()) metadata = metadata.withFallback(readOriginalMetadata(uri, all));
                 if (!metadata.usable()) throw new IOException("照片内没有可用的拍摄参数（可能已被聊天软件压缩去除），无法生成水印");
                 ExifInterface originalExif = new ExifInterface(new ByteArrayInputStream(parts.imageBytes));
+                ExifBuilder.Fields exifFields = ExifFields.from(originalExif);
                 String originalXmp = MotionPhotoSupport.extractXmp(parts.imageBytes);
                 long presentationTs = parsePresentationTimestampUs(originalXmp);
                 Bitmap decoded = BitmapFactory.decodeByteArray(parts.imageBytes, 0, parts.imageBytes.length);
@@ -196,11 +197,11 @@ public final class MainActivity extends Activity {
                 byte[] still = java.nio.file.Files.readAllBytes(temp.toPath()); temp.delete();
                 byte[] result;
                 if (parts.motion) {
-                    byte[] stillWithMeta = ExifBuilder.buildMotionJpeg(still, originalExif,
+                    byte[] stillWithMeta = ExifBuilder.buildMotionJpeg(still, exifFields,
                             renderedVideo.length, Math.max(presentationTs, 0), originalXmp);
                     result = MotionPhotoSupport.join(stillWithMeta, renderedVideo);
                 } else {
-                    result = ExifBuilder.buildStillJpeg(still, originalExif);
+                    result = ExifBuilder.buildStillJpeg(still, exifFields);
                 }
                 if (parts.motion && !MotionPhotoSupport.hasVideo(result)) throw new IOException("动态照片视频资源校验失败");
                 finishedBytes = result; sourceWasMotion = parts.motion;

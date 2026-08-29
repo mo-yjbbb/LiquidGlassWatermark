@@ -1,6 +1,5 @@
 package com.localwatermark.liquidglass.android;
 
-import androidx.exifinterface.media.ExifInterface;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -11,6 +10,9 @@ import java.util.List;
  * 手工构造 EXIF APP1（含小米相册识别动态照片的私有标签 0x8897）并注入 JPEG。
  * androidx ExifInterface 不支持自定义标签，所以这里直接按 TIFF 6.0 规范写字节。
  * 布局：TIFF 头 + IFD0(含 Exif/GPS 指针) + Exif IFD(含 0x8897) + GPS IFD + 数据区。
+ *
+ * <p>字节构造只依赖 {@link Fields}（纯 POJO），与 Android 运行时无关，因此可以在
+ * 普通 JVM 单元测试里直接验证。
  */
 final class ExifBuilder {
     private ExifBuilder() {}
@@ -18,7 +20,16 @@ final class ExifBuilder {
     private static final int TYPE_BYTE = 1, TYPE_ASCII = 2, TYPE_SHORT = 3, TYPE_LONG = 4, TYPE_RATIONAL = 5;
     private static final int TAG_EXIF_IFD_POINTER = 0x8769, TAG_GPS_IFD_POINTER = 0x8825;
     /** 小米相册（澎湃OS/MIUI）判定动态照片的私有标签，类型 BYTE，值 1。 */
-    private static final int TAG_XIAOMI_MOTION = 0x8897;
+    static final int TAG_XIAOMI_MOTION = 0x8897;
+
+    /** 从原图抽取出的拍摄参数快照（纯数据，便于测试）。 */
+    static final class Fields {
+        String make, model;
+        String dateTime, dateTimeOriginal, dateTimeDigitized;
+        String exposureTime, fNumber, focalLength; // "num/den" 形式
+        int iso = -1, focal35 = -1;
+        double latitude = Double.NaN, longitude = Double.NaN, altitude = Double.NaN;
+    }
 
     private static final class Entry {
         final int tag, type, count;
@@ -28,10 +39,12 @@ final class ExifBuilder {
         }
     }
 
+    // ---------- 对外入口 ----------
+
     /** 生成动态照片 JPEG：注入 EXIF（含 0x8897）与动态照片 XMP。 */
-    static byte[] buildMotionJpeg(byte[] jpeg, ExifInterface src, long videoLength,
+    static byte[] buildMotionJpeg(byte[] jpeg, Fields fields, long videoLength,
                                   long presentationTimestampUs, String originalXmp) {
-        byte[] tiff = buildTiff(src, true);
+        byte[] tiff = buildTiff(fields, true);
         // XMP 里的 Primary Item 长度必须等于"注入元数据之后"的 JPEG 长度，而这个长度又受
         // 该数字自身的位数影响，所以迭代到两者相等为止（最多差 1 字节，几轮必收敛）。
         long stillLength = jpeg.length;
@@ -48,27 +61,27 @@ final class ExifBuilder {
     }
 
     /** 生成静态照片 JPEG：只注入 EXIF 拍摄参数。 */
-    static byte[] buildStillJpeg(byte[] jpeg, ExifInterface src) {
-        return inject(jpeg, buildTiff(src, false), null);
+    static byte[] buildStillJpeg(byte[] jpeg, Fields fields) {
+        return inject(jpeg, buildTiff(fields, false), null);
     }
 
-    private static byte[] buildTiff(ExifInterface src, boolean motion) {
+    // ---------- TIFF 构造 ----------
+
+    private static byte[] buildTiff(Fields src, boolean motion) {
         List<Entry> ifd0 = new ArrayList<>();
         List<Entry> exif = new ArrayList<>();
-        addAscii(ifd0, 0x010F, src.getAttribute(ExifInterface.TAG_MAKE));
-        addAscii(ifd0, 0x0110, src.getAttribute(ExifInterface.TAG_MODEL));
+        addAscii(ifd0, 0x010F, src.make);
+        addAscii(ifd0, 0x0110, src.model);
         ifd0.add(new Entry(0x0112, TYPE_SHORT, 1, shortBytes(1))); // Orientation = Normal
-        addAscii(ifd0, 0x0132, src.getAttribute(ExifInterface.TAG_DATETIME));
-        addRationalAttr(exif, 0x829A, src.getAttribute(ExifInterface.TAG_EXPOSURE_TIME));
-        addRationalAttr(exif, 0x829D, src.getAttribute(ExifInterface.TAG_F_NUMBER));
-        int iso = src.getAttributeInt(ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY, -1);
-        if (iso > 0) exif.add(new Entry(0x8827, TYPE_SHORT, 1, shortBytes(iso)));
+        addAscii(ifd0, 0x0132, src.dateTime);
+        addRationalAttr(exif, 0x829A, src.exposureTime);
+        addRationalAttr(exif, 0x829D, src.fNumber);
+        if (src.iso > 0) exif.add(new Entry(0x8827, TYPE_SHORT, 1, shortBytes(src.iso)));
         if (motion) exif.add(new Entry(TAG_XIAOMI_MOTION, TYPE_BYTE, 1, new byte[]{1}));
-        addAscii(exif, 0x9003, src.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL));
-        addAscii(exif, 0x9004, src.getAttribute(ExifInterface.TAG_DATETIME_DIGITIZED));
-        addRationalAttr(exif, 0x920A, src.getAttribute(ExifInterface.TAG_FOCAL_LENGTH));
-        int focal35 = src.getAttributeInt(ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM, -1);
-        if (focal35 > 0) exif.add(new Entry(0xA405, TYPE_SHORT, 1, shortBytes(focal35)));
+        addAscii(exif, 0x9003, src.dateTimeOriginal);
+        addAscii(exif, 0x9004, src.dateTimeDigitized);
+        addRationalAttr(exif, 0x920A, src.focalLength);
+        if (src.focal35 > 0) exif.add(new Entry(0xA405, TYPE_SHORT, 1, shortBytes(src.focal35)));
         List<Entry> gps = buildGps(src);
 
         ifd0.sort(Comparator.comparingInt((Entry e) -> e.tag));
@@ -108,25 +121,20 @@ final class ExifBuilder {
         return tiff;
     }
 
-    private static List<Entry> buildGps(ExifInterface src) {
+    private static List<Entry> buildGps(Fields src) {
         List<Entry> gps = new ArrayList<>();
-        float[] latLng = new float[2];
-        boolean hasPosition = false;
-        try { hasPosition = src.getLatLong(latLng); } catch (Throwable ignored) { }
-        if (!hasPosition || Float.isNaN(latLng[0]) || Float.isNaN(latLng[1])
-                || (latLng[0] == 0 && latLng[1] == 0)) return gps;
-        float lat = latLng[0], lon = latLng[1];
+        if (Double.isNaN(src.latitude) || Double.isNaN(src.longitude)) return gps;
+        if (src.latitude == 0 && src.longitude == 0) return gps;
+        double lat = src.latitude, lon = src.longitude;
         gps.add(new Entry(0x0001, TYPE_ASCII, 2, asciiBytes(lat >= 0 ? "N" : "S")));
         gps.add(new Entry(0x0002, TYPE_RATIONAL, 3, dmsBytes(Math.abs(lat))));
         gps.add(new Entry(0x0003, TYPE_ASCII, 2, asciiBytes(lon >= 0 ? "E" : "W")));
         gps.add(new Entry(0x0004, TYPE_RATIONAL, 3, dmsBytes(Math.abs(lon))));
-        try {
-            double altitude = src.getAltitude(0);
-            if (altitude != 0) {
-                gps.add(new Entry(0x0005, TYPE_BYTE, 1, new byte[]{(byte) (altitude >= 0 ? 0 : 1)}));
-                gps.add(new Entry(0x0006, TYPE_RATIONAL, 1, rationalBytes(Math.round(Math.abs(altitude) * 100), 100)));
-            }
-        } catch (Throwable ignored) { }
+        if (!Double.isNaN(src.altitude) && src.altitude != 0) {
+            gps.add(new Entry(0x0005, TYPE_BYTE, 1, new byte[]{(byte) (src.altitude >= 0 ? 0 : 1)}));
+            gps.add(new Entry(0x0006, TYPE_RATIONAL, 1,
+                    rationalBytes(Math.round(Math.abs(src.altitude) * 100), 100)));
+        }
         return gps;
     }
 
