@@ -91,9 +91,9 @@ final class GlassRenderer: @unchecked Sendable {
         // and colourful areas therefore create stronger coloured highlights,
         // while dark areas stay subtle instead of receiving a painted line.
         let liftedSource = source.applyingFilter("CIColorControls", parameters: [
-            kCIInputSaturationKey: 1.12,
-            kCIInputBrightnessKey: 0.012,
-            kCIInputContrastKey: 1.10
+            kCIInputSaturationKey: 1.34,
+            kCIInputBrightnessKey: 0.006,
+            kCIInputContrastKey: 1.18
         ])
         let reflectedRim = liftedSource.applyingFilter("CIScreenBlendMode", parameters: [
             kCIInputBackgroundImageKey: reflectedBody
@@ -253,13 +253,30 @@ final class GlassRenderer: @unchecked Sendable {
             // It is deliberately flat: no white gradient, blur, or haze.
             UIColor.white.withAlphaComponent(0.03).setFill()
             path.fill()
+            // A restrained Apple-like spectral sheen. It stays translucent
+            // and is only a secondary accent; photo-driven colour reflection
+            // remains the dominant optical response in the Core Image pass.
+            ctx.saveGState()
+            path.addClip()
+            ctx.setBlendMode(.screen)
+            let rainbowSheen = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
+                UIColor(red: 0.30, green: 0.75, blue: 1.00, alpha: 0).cgColor,
+                UIColor(red: 0.30, green: 0.75, blue: 1.00, alpha: 0.022).cgColor,
+                UIColor(red: 0.86, green: 0.42, blue: 1.00, alpha: 0.028).cgColor,
+                UIColor(red: 1.00, green: 0.72, blue: 0.30, alpha: 0.020).cgColor,
+                UIColor(red: 1.00, green: 0.72, blue: 0.30, alpha: 0).cgColor
+            ] as CFArray, locations: [0, 0.22, 0.52, 0.80, 1])!
+            ctx.drawLinearGradient(rainbowSheen,
+                start: CGPoint(x: rect.minX, y: rect.maxY),
+                end: CGPoint(x: rect.maxX, y: rect.minY), options: [])
+            ctx.restoreGState()
             // Transparent optical reflections cover the complete capsule.
             // These are highlights only (no translucent fill), so the centre
             // keeps the same clarity while still reading as curved glass.
             // Two independent horizontal hairline reflections. They stop and
             // fade before the rounded corners, so this can never read as a
             // closed outline. No shadow, blur, or outer glow is used.
-            let hairline = max(0.81 * scale, 0.66)
+            let hairline = max(0.92 * scale, 0.75)
             let edgeLight = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [
                 UIColor.white.withAlphaComponent(0.58).cgColor,
                 UIColor.white.withAlphaComponent(0.20).cgColor,
@@ -393,7 +410,8 @@ private enum BrandMark {
 
 private func brandMark(for device: String) -> BrandMark {
     let value = device.lowercased()
-    if value.contains("iphone") || value.contains("apple") { return .apple }
+    if value.contains("iphone") || value.contains("ipad") ||
+        value.contains("ipod") || value.contains("apple") { return .apple }
     // Prefer the imaging partner used by the phone family. When no known
     // partnership exists, fall back to the device maker's own word mark.
     if value.contains("xiaomi") || value.contains("redmi") || value.contains("poco") {
