@@ -7,7 +7,6 @@ import android.net.Uri;
 import android.os.*;
 import android.provider.MediaStore;
 import android.graphics.drawable.GradientDrawable;
-import android.graphics.drawable.LayerDrawable;
 import android.view.*;
 import android.widget.*;
 import androidx.exifinterface.media.ExifInterface;
@@ -16,12 +15,16 @@ import java.util.concurrent.*;
 
 public final class MainActivity extends Activity {
     private static final int PICK_IMAGE = 42;
+    private static final int MEDIA_LOCATION_PERMISSION = 43;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private ImageView preview;
+    private View emptyState;
     private ProgressBar progress;
     private Uri sourceUri;
     private byte[] finishedBytes;
     private boolean sourceWasMotion;
+    private boolean openPickerAfterPermission;
+    private Uri pendingSharedUri;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -39,13 +42,37 @@ public final class MainActivity extends Activity {
             view.setPadding(dp(20), bars.top + dp(18), dp(20), bars.bottom + dp(18));
             return insets;
         });
-        TextView title = new TextView(this); title.setText("液态玻璃水印"); title.setTextSize(27); title.setTextColor(Color.WHITE);
-        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD); title.setGravity(Gravity.CENTER);
-        TextView subtitle = new TextView(this); subtitle.setText("小米 · 徕卡动态影像"); subtitle.setTextSize(14);
-        subtitle.setTextColor(0xbbffffff); subtitle.setGravity(Gravity.CENTER); subtitle.setPadding(0,dp(5),0,dp(16));
+        LinearLayout header = new LinearLayout(this); header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL); header.setPadding(dp(2),0,0,dp(18));
+        ImageView brandIcon = new ImageView(this); brandIcon.setImageResource(R.drawable.ic_launcher_legacy);
+        GradientDrawable iconPlate = new GradientDrawable(); iconPlate.setColor(0x18ffffff); iconPlate.setCornerRadius(dp(16));
+        iconPlate.setStroke(dp(1),0x30ffffff); brandIcon.setBackground(iconPlate); brandIcon.setPadding(dp(5),dp(5),dp(5),dp(5));
+        LinearLayout heading = new LinearLayout(this); heading.setOrientation(LinearLayout.VERTICAL); heading.setPadding(dp(13),0,0,0);
+        TextView title = new TextView(this); title.setText("液态玻璃水印"); title.setTextSize(25); title.setTextColor(Color.WHITE);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD); title.setGravity(Gravity.START);
+        TextView subtitle = new TextView(this); subtitle.setText("小米 · 徕卡动态影像"); subtitle.setTextSize(13);
+        subtitle.setTextColor(0xaaffffff); subtitle.setGravity(Gravity.START); subtitle.setPadding(0,dp(3),0,0);
+        heading.addView(title); heading.addView(subtitle);
+        header.addView(brandIcon,new LinearLayout.LayoutParams(dp(54),dp(54)));
+        header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
+
+        FrameLayout previewCard = new FrameLayout(this);
+        GradientDrawable previewBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{0x20ffffff,0x09000000,0x16ff6d9e});
+        previewBg.setCornerRadius(dp(26)); previewBg.setStroke(dp(1),0x3cffffff);
+        previewCard.setBackground(previewBg); previewCard.setPadding(dp(7),dp(7),dp(7),dp(7));
         preview = new ImageView(this); preview.setAdjustViewBounds(true); preview.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        GradientDrawable previewBg = new GradientDrawable(); previewBg.setColor(0x22000000); previewBg.setCornerRadius(dp(24));
-        previewBg.setStroke(dp(1),0x28ffffff); preview.setBackground(previewBg); preview.setPadding(dp(6),dp(6),dp(6),dp(6));
+        previewCard.addView(preview,new FrameLayout.LayoutParams(-1,-1));
+        LinearLayout empty = new LinearLayout(this); empty.setOrientation(LinearLayout.VERTICAL); empty.setGravity(Gravity.CENTER);
+        empty.setPadding(dp(26),dp(28),dp(26),dp(28));
+        ImageView emptyIcon = new ImageView(this); emptyIcon.setImageResource(R.drawable.ic_launcher_legacy); emptyIcon.setAlpha(.92f);
+        TextView emptyTitle = new TextView(this); emptyTitle.setText("选择一张照片开始"); emptyTitle.setTextColor(Color.WHITE);
+        emptyTitle.setTextSize(20); emptyTitle.setTypeface(Typeface.DEFAULT,Typeface.BOLD); emptyTitle.setGravity(Gravity.CENTER);
+        emptyTitle.setPadding(0,dp(16),0,dp(7));
+        TextView emptyHint = new TextView(this); emptyHint.setText("支持小米静态照片与动态照片\n读取真实拍摄参数 · 原画质输出");
+        emptyHint.setTextColor(0x99ffffff); emptyHint.setTextSize(14); emptyHint.setGravity(Gravity.CENTER); emptyHint.setLineSpacing(dp(3),1);
+        empty.addView(emptyIcon,new LinearLayout.LayoutParams(dp(78),dp(78))); empty.addView(emptyTitle); empty.addView(emptyHint);
+        emptyState = empty; previewCard.addView(empty,new FrameLayout.LayoutParams(-1,-1));
         progress = new ProgressBar(this); progress.setVisibility(View.GONE);
         Button select = new Button(this); select.setText("从相册选择照片"); select.setTextColor(Color.WHITE);
         select.setTextSize(17); select.setAllCaps(false); select.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
@@ -54,9 +81,9 @@ public final class MainActivity extends Activity {
         glassButton.setCornerRadius(dp(30)); glassButton.setStroke(dp(1),0x88ffffff);
         select.setBackground(glassButton); select.setElevation(dp(8)); select.setPadding(dp(24),dp(14),dp(24),dp(14));
         select.setOnClickListener(v -> pick());
-        root.addView(title, new LinearLayout.LayoutParams(-1, -2));
-        root.addView(subtitle, new LinearLayout.LayoutParams(-1, -2));
-        root.addView(preview, new LinearLayout.LayoutParams(-1, 0, 1));
+        root.addView(header, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1,0,1); cardParams.bottomMargin=dp(4);
+        root.addView(previewCard, cardParams);
         root.addView(progress); LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(-1,-2);
         buttonParams.topMargin=dp(12); root.addView(select, buttonParams); setContentView(root);
         handleIntent(getIntent());
@@ -65,6 +92,17 @@ public final class MainActivity extends Activity {
     @Override protected void onNewIntent(Intent intent) { super.onNewIntent(intent); setIntent(intent); handleIntent(intent); }
 
     private void pick() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                && checkSelfPermission(android.Manifest.permission.ACCESS_MEDIA_LOCATION)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            openPickerAfterPermission = true;
+            requestPermissions(new String[]{android.Manifest.permission.ACCESS_MEDIA_LOCATION}, MEDIA_LOCATION_PERMISSION);
+            return;
+        }
+        openGallery();
+    }
+
+    private void openGallery() {
         Intent intent;
         if (Build.VERSION.SDK_INT >= 33) {
             intent = new Intent(MediaStore.ACTION_PICK_IMAGES).setType("image/*");
@@ -84,7 +122,24 @@ public final class MainActivity extends Activity {
                 //noinspection deprecation
                 uri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
             }
-            if (uri != null) process(uri);
+            if (uri != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                        && checkSelfPermission(android.Manifest.permission.ACCESS_MEDIA_LOCATION)
+                        != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    pendingSharedUri = uri;
+                    requestPermissions(new String[]{android.Manifest.permission.ACCESS_MEDIA_LOCATION}, MEDIA_LOCATION_PERMISSION);
+                } else process(uri);
+            }
+        }
+    }
+
+    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(requestCode, permissions, results);
+        if (requestCode != MEDIA_LOCATION_PERMISSION) return;
+        if (pendingSharedUri != null) {
+            Uri uri = pendingSharedUri; pendingSharedUri = null; process(uri);
+        } else if (openPickerAfterPermission) {
+            openPickerAfterPermission = false; openGallery();
         }
     }
 
@@ -99,7 +154,7 @@ public final class MainActivity extends Activity {
     }
 
     private void process(Uri uri) {
-        sourceUri = uri; progress.setVisibility(View.VISIBLE); finishedBytes = null;
+        sourceUri = uri; progress.setVisibility(View.VISIBLE); finishedBytes = null; emptyState.setVisibility(View.GONE);
         worker.execute(() -> {
             try {
                 byte[] all = readAll(uri); MotionPhotoSupport.Parts parts = MotionPhotoSupport.split(all);
@@ -137,7 +192,8 @@ public final class MainActivity extends Activity {
                     showSaveChoice();
                 });
             } catch (Throwable error) {
-                runOnUiThread(() -> { progress.setVisibility(View.GONE); Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show(); });
+                runOnUiThread(() -> { progress.setVisibility(View.GONE); emptyState.setVisibility(View.VISIBLE);
+                    Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show(); });
             }
         });
     }
@@ -177,7 +233,18 @@ public final class MainActivity extends Activity {
 
     private void notifyError(Throwable e) { runOnUiThread(() -> Toast.makeText(this, "保存失败：" + e.getMessage(), Toast.LENGTH_LONG).show()); }
     private void write(Uri uri, byte[] bytes) throws IOException { try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("没有写入权限");out.write(bytes);} }
-    private byte[] readAll(Uri uri) throws IOException { try(InputStream in=getContentResolver().openInputStream(uri); ByteArrayOutputStream out=new ByteArrayOutputStream()){if(in==null)throw new IOException("无法读取照片");byte[] b=new byte[131072];for(int n;(n=in.read(b))>=0;)out.write(b,0,n);return out.toByteArray();} }
+    private byte[] readAll(Uri uri) throws IOException {
+        Uri readable = uri;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                && checkSelfPermission(android.Manifest.permission.ACCESS_MEDIA_LOCATION)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            try { readable = MediaStore.setRequireOriginal(uri); } catch (Throwable ignored) { readable = uri; }
+        }
+        try(InputStream in=getContentResolver().openInputStream(readable); ByteArrayOutputStream out=new ByteArrayOutputStream()){
+            if(in==null)throw new IOException("无法读取照片");byte[] b=new byte[131072];
+            for(int n;(n=in.read(b))>=0;)out.write(b,0,n);return out.toByteArray();
+        }
+    }
 
     private static Bitmap orient(Bitmap input, int orientation) {
         Matrix m = new Matrix(); if(orientation==ExifInterface.ORIENTATION_ROTATE_90)m.postRotate(90); else if(orientation==ExifInterface.ORIENTATION_ROTATE_180)m.postRotate(180); else if(orientation==ExifInterface.ORIENTATION_ROTATE_270)m.postRotate(270);
