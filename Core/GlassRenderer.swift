@@ -418,7 +418,7 @@ private func brandMark(for device: String) -> BrandMark {
         return .leica
     }
     if value.contains("huawei") { return .xmage }
-    if value.contains("honor") { return .honor }
+    if value.contains("honor") || value.contains("荣耀") { return .honor }
     if value.contains("oneplus") || value.contains("one plus") || value.contains("oppo") {
         return .hasselblad
     }

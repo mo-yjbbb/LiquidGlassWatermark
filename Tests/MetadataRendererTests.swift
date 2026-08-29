@@ -87,6 +87,23 @@ final class MetadataRendererTests: XCTestCase {
         XCTAssertEqual(metadata.device, "iPhone 17 Pro")
     }
 
+    func testHonorInternalModelResolvesToMarketingName() throws {
+        let url = try makeFixture(includeMetadata: true,
+                                  make: "HONOR", model: "AAK-AN00")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let metadata = MetadataReader.read(asset: nil, imageURL: url)
+        XCTAssertEqual(metadata.device, "HONOR WIN RT")
+
+        let source = try XCTUnwrap(CIImage(contentsOf: url,
+                                           options: [.applyOrientationProperty: true]))
+        let renderer = GlassRenderer(metadata: metadata)
+        let rendered = try XCTUnwrap(renderer.makeCGImage(renderer.render(source)))
+        let attachment = XCTAttachment(image: UIImage(cgImage: rendered))
+        attachment.name = "honor-win-rt-liquid-glass-preview"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     private func makeFixture(includeMetadata: Bool,
                              make: String = "Xiaomi",
                              model: String = "Xiaomi 15 Pro") throws -> URL {
@@ -145,4 +162,3 @@ final class MetadataRendererTests: XCTestCase {
         return url
     }
 }
-
