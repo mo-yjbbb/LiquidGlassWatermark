@@ -41,6 +41,7 @@ final class LiquidGlassVideoEffect implements GlEffect {
                 throws VideoFrameProcessingException {
             try {
                 program.use();
+                program.setFloatUniform("uTime", presentationTimeUs / 1_000_000f);
                 program.setSamplerTexIdUniform("uTexSampler", inputTexId, 0);
                 program.bindAttributesAndUniforms();
                 GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);

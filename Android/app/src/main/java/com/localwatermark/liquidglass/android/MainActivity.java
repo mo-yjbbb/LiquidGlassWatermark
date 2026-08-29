@@ -169,6 +169,8 @@ public final class MainActivity extends Activity {
                 if (hasMediaLocationPermission()) metadata = metadata.withFallback(readOriginalMetadata(uri, all));
                 if (!metadata.usable()) throw new IOException("照片内没有可用的拍摄参数（可能已被聊天软件压缩去除），无法生成水印");
                 ExifInterface originalExif = new ExifInterface(new ByteArrayInputStream(parts.imageBytes));
+                String originalXmp = MotionPhotoSupport.extractXmp(parts.imageBytes);
+                long presentationTs = parsePresentationTimestampUs(originalXmp);
                 Bitmap decoded = BitmapFactory.decodeByteArray(parts.imageBytes, 0, parts.imageBytes.length);
                 if (decoded == null) throw new IOException("无法解码照片");
                 Bitmap oriented = orient(decoded, originalExif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL));
@@ -182,6 +184,7 @@ public final class MainActivity extends Activity {
                         MotionVideoRenderer.render(this, inputVideo, outputVideo,
                                 oriented.getWidth(), oriented.getHeight(), metadata);
                         renderedVideo = java.nio.file.Files.readAllBytes(outputVideo.toPath());
+                        if (presentationTs < 0) presentationTs = videoDurationUsHalf(inputVideo);
                     } finally {
                         inputVideo.delete(); outputVideo.delete();
                     }
@@ -190,9 +193,15 @@ public final class MainActivity extends Activity {
                 try (OutputStream out = new FileOutputStream(temp)) {
                     if (!rendered.compress(Bitmap.CompressFormat.JPEG, 100, out)) throw new IOException("JPEG 编码失败");
                 }
-                copyExif(originalExif, new ExifInterface(temp), parts.motion ? renderedVideo.length : 0);
                 byte[] still = java.nio.file.Files.readAllBytes(temp.toPath()); temp.delete();
-                byte[] result = parts.motion ? MotionPhotoSupport.join(still, renderedVideo) : still;
+                byte[] result;
+                if (parts.motion) {
+                    byte[] stillWithMeta = ExifBuilder.buildMotionJpeg(still, originalExif,
+                            renderedVideo.length, Math.max(presentationTs, 0), originalXmp);
+                    result = MotionPhotoSupport.join(stillWithMeta, renderedVideo);
+                } else {
+                    result = ExifBuilder.buildStillJpeg(still, originalExif);
+                }
                 if (parts.motion && !MotionPhotoSupport.hasVideo(result)) throw new IOException("动态照片视频资源校验失败");
                 finishedBytes = result; sourceWasMotion = parts.motion;
                 runOnUiThread(() -> {
@@ -272,7 +281,9 @@ public final class MainActivity extends Activity {
 
     private void showSaveChoice() {
         new AlertDialog.Builder(this).setTitle(sourceWasMotion ? "动态照片处理完成" : "照片处理完成")
-                .setMessage("请选择保存方式")
+                .setMessage(sourceWasMotion
+                        ? "液态玻璃动态水印已合成，保存后在小米相册长按或下拉即可播放动态效果。"
+                        : "已生成静态液态玻璃水印照片。\n提示：如果这张原本是动态照片，请直接在系统相册中选择（不要从微信/QQ等应用转发），否则动态视频数据会丢失。")
                 .setPositiveButton("保存新图", (d,w) -> saveNew())
                 .setNegativeButton("覆盖原图", (d,w) -> overwrite())
                 .setNeutralButton("取消", null).show();
@@ -383,23 +394,30 @@ public final class MainActivity extends Activity {
         if(m.isIdentity())return input; Bitmap out=Bitmap.createBitmap(input,0,0,input.getWidth(),input.getHeight(),m,true); if(out!=input)input.recycle(); return out;
     }
 
-    private static void copyExif(ExifInterface src, ExifInterface dst, int motionVideoLength) throws IOException {
-        String[] tags={ExifInterface.TAG_MAKE,ExifInterface.TAG_MODEL,ExifInterface.TAG_DATETIME,ExifInterface.TAG_DATETIME_ORIGINAL,ExifInterface.TAG_DATETIME_DIGITIZED,ExifInterface.TAG_F_NUMBER,ExifInterface.TAG_EXPOSURE_TIME,ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY,ExifInterface.TAG_FOCAL_LENGTH,ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM,ExifInterface.TAG_GPS_LATITUDE,ExifInterface.TAG_GPS_LATITUDE_REF,ExifInterface.TAG_GPS_LONGITUDE,ExifInterface.TAG_GPS_LONGITUDE_REF,ExifInterface.TAG_GPS_ALTITUDE,ExifInterface.TAG_GPS_ALTITUDE_REF};
-        for(String tag:tags){String value=src.getAttribute(tag);if(value!=null)dst.setAttribute(tag,value);}
-        if (motionVideoLength > 0) dst.setAttribute(ExifInterface.TAG_XMP, motionXmp(motionVideoLength));
-        dst.setAttribute(ExifInterface.TAG_ORIENTATION,String.valueOf(ExifInterface.ORIENTATION_NORMAL)); dst.saveAttributes();
+    /** 从原始 XMP 中解析动态照片的关键帧时间戳，没有返回 -1。 */
+    private static long parsePresentationTimestampUs(String xmp) {
+        if (xmp == null) return -1;
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("(?:MicroVideo|MotionPhoto)PresentationTimestampUs=\"(-?\\d+)\"").matcher(xmp);
+        if (m.find()) {
+            try { return Long.parseLong(m.group(1)); } catch (NumberFormatException ignored) { }
+        }
+        return -1;
     }
 
-    private static String motionXmp(int videoLength) {
-        return "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">"
-                + "<rdf:Description xmlns:Camera=\"http://ns.google.com/photos/1.0/camera/\" "
-                + "Camera:MotionPhoto=\"1\" Camera:MotionPhotoVersion=\"1\" Camera:MotionPhotoPresentationTimestampUs=\"-1\" "
-                + "Camera:MicroVideo=\"1\" Camera:MicroVideoVersion=\"1\" Camera:MicroVideoOffset=\"" + videoLength + "\">"
-                + "<Container:Directory xmlns:Container=\"http://ns.google.com/photos/1.0/container/\" "
-                + "xmlns:Item=\"http://ns.google.com/photos/1.0/container/item/\"><rdf:Seq>"
-                + "<rdf:li rdf:parseType=\"Resource\"><Container:Item Item:Mime=\"image/jpeg\" Item:Semantic=\"Primary\"/></rdf:li>"
-                + "<rdf:li rdf:parseType=\"Resource\"><Container:Item Item:Mime=\"video/mp4\" Item:Semantic=\"MotionPhoto\" Item:Length=\"" + videoLength + "\"/></rdf:li>"
-                + "</rdf:Seq></Container:Directory></rdf:Description></rdf:RDF></x:xmpmeta>";
+    /** 兜底：取视频时长的一半作为关键帧时间戳（微秒）。 */
+    private static long videoDurationUsHalf(File video) {
+        try {
+            android.media.MediaMetadataRetriever retriever = new android.media.MediaMetadataRetriever();
+            try {
+                retriever.setDataSource(video.getAbsolutePath());
+                String durationMs = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION);
+                if (durationMs != null) return Long.parseLong(durationMs) * 1000L / 2L;
+            } finally {
+                try { retriever.release(); } catch (Throwable ignored) { }
+            }
+        } catch (Throwable ignored) { }
+        return -1;
     }
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
     @Override protected void onDestroy(){super.onDestroy();worker.shutdownNow();}
