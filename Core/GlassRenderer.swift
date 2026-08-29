@@ -460,13 +460,29 @@ private func drawBrandMark(_ mark: BrandMark, in rect: CGRect, context ctx: CGCo
                                 withAttributes: [.font: font, .foregroundColor: color])
     }
 
+    func drawAspectFit(_ image: UIImage, in target: CGRect,
+                       tint: UIColor? = nil) {
+        guard image.size.width > 0, image.size.height > 0 else { return }
+        let factor = min(target.width / image.size.width,
+                         target.height / image.size.height)
+        let size = CGSize(width: image.size.width * factor,
+                          height: image.size.height * factor)
+        let fitted = CGRect(x: target.midX - size.width * 0.5,
+                            y: target.midY - size.height * 0.5,
+                            width: size.width, height: size.height)
+        let drawable = tint.map {
+            image.withTintColor($0, renderingMode: .alwaysOriginal)
+        } ?? image
+        drawable.draw(in: fitted, blendMode: .normal, alpha: 1)
+    }
+
     switch mark {
     case .apple:
         let font = UIFont.systemFont(ofSize: rect.height * 0.83, weight: .medium)
         centeredText("", font: font, color: .white)
     case .leica:
         if let suppliedLogo = UIImage(named: "LeicaLogo") {
-            suppliedLogo.draw(in: rect, blendMode: .normal, alpha: 1)
+            drawAspectFit(suppliedLogo, in: rect)
             break
         }
         let circle = CGRect(x: rect.midX - rect.height * 0.48,
@@ -479,7 +495,7 @@ private func drawBrandMark(_ mark: BrandMark, in rect: CGRect, context ctx: CGCo
         centeredText("Leica", font: font, color: .white)
     case .xmage:
         if let suppliedLogo = UIImage(named: "HuaweiLogo") {
-            suppliedLogo.draw(in: rect, blendMode: .normal, alpha: 1)
+            drawAspectFit(suppliedLogo, in: rect)
             break
         }
         let font = UIFont.systemFont(ofSize: rect.height * 0.53, weight: .bold)
@@ -528,8 +544,7 @@ private func drawBrandMark(_ mark: BrandMark, in rect: CGRect, context ctx: CGCo
                      color: UIColor(red: 0.96, green: 0.66, blue: 0.02, alpha: 1))
     case .honor:
         if let suppliedLogo = UIImage(named: "HonorLogo") {
-            suppliedLogo.withTintColor(.white, renderingMode: .alwaysOriginal)
-                .draw(in: rect, blendMode: .normal, alpha: 1)
+            drawAspectFit(suppliedLogo, in: rect, tint: .white)
             break
         }
         let iconSize = rect.height * 0.84
