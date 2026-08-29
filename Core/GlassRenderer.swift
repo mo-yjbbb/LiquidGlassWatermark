@@ -443,7 +443,7 @@ private func brandAspectRatio(_ mark: BrandMark) -> CGFloat {
     case .honor: return 161.0 / 42.0
     case .hasselblad: return 1.28
     case .zeiss: return 1.05
-    case .xmage: return 1.9
+    case .xmage: return 650.0 / 150.0
     case .iqoo: return 2.05
     case .word(let text, _): return max(0.8, min(CGFloat(text.count) * 0.62, 2.5))
     }
@@ -478,6 +478,10 @@ private func drawBrandMark(_ mark: BrandMark, in rect: CGRect, context ctx: CGCo
             ?? UIFont.italicSystemFont(ofSize: rect.height * 0.32)
         centeredText("Leica", font: font, color: .white)
     case .xmage:
+        if let suppliedLogo = UIImage(named: "HuaweiLogo") {
+            suppliedLogo.draw(in: rect, blendMode: .normal, alpha: 1)
+            break
+        }
         let font = UIFont.systemFont(ofSize: rect.height * 0.53, weight: .bold)
         centeredText("XMAGE", font: font,
                      color: UIColor(red: 0.78, green: 0, blue: 0.16, alpha: 1))
