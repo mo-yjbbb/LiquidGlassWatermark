@@ -2,30 +2,27 @@
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- 液态玻璃水滴主体（位于 66dp 安全区内） -->
-    <path android:pathData="M54,30 C62.5,43 77,48.5 77,61 A23,23 0 1,1 31,61 C31,48.5 45.5,43 54,30 Z">
+    <!-- 液态玻璃水滴主体：撑满中心 66dp 安全区，确保 MIUI 任意遮罩下都饱满 -->
+    <path android:pathData="M54,26 C64,41 78,47 78,62 A24,24 0 1,1 30,62 C30,47 44,41 54,26 Z">
         <aapt:attr name="android:fillColor">
             <gradient android:type="linear" android:angle="90"
-                android:startColor="#99FFFFFF" android:endColor="#24FFFFFF"/>
+                android:startColor="#F5FFFFFF" android:centerColor="#C4FFFFFF" android:endColor="#40FFFFFF"/>
         </aapt:attr>
     </path>
-    <path android:pathData="M54,30 C62.5,43 77,48.5 77,61 A23,23 0 1,1 31,61 C31,48.5 45.5,43 54,30 Z"
-        android:strokeColor="#D9FFFFFF" android:strokeWidth="2.4"/>
+    <path android:pathData="M54,26 C64,41 78,47 78,62 A24,24 0 1,1 30,62 C30,47 44,41 54,26 Z"
+        android:strokeColor="#FFFFFFFF" android:strokeWidth="2.6"/>
     <!-- 玻璃高光 -->
-    <path android:pathData="M40,60 A14.8,14.8 0 0,1 51,45"
-        android:strokeColor="#E6FFFFFF" android:strokeWidth="3.6"
+    <path android:pathData="M38,58 A17,17 0 0,1 51,42"
+        android:strokeColor="#FFFFFFFF" android:strokeWidth="4.2"
         android:strokeLineCap="round"/>
     <!-- 水面反光线 -->
-    <path android:pathData="M42,68 A13,9 0 0,0 66,68"
-        android:strokeColor="#59FFFFFF" android:strokeWidth="2.2"
+    <path android:pathData="M40,68 A15,9 0 0,0 68,68"
+        android:strokeColor="#73FFFFFF" android:strokeWidth="2.4"
         android:strokeLineCap="round"/>
-    <!-- 小玻璃珠 -->
-    <path android:pathData="M79,78m-6.5,0a6.5,6.5 0 1,0 13,0a6.5,6.5 0 1,0 -13,0"
-        android:fillColor="#2EFFFFFF" android:strokeColor="#B3FFFFFF" android:strokeWidth="1.6"/>
-    <!-- 大星光 -->
-    <path android:pathData="M74,27 C75.2,34.8 77.2,36.8 85,38 C77.2,39.2 75.2,41.2 74,49 C72.8,41.2 70.8,39.2 63,38 C70.8,36.8 72.8,34.8 74,27 Z"
+    <!-- 液滴内部气泡 -->
+    <path android:pathData="M64,74m-4,0a4,4 0 1,0 8,0a4,4 0 1,0 -8,0"
+        android:fillColor="#59FFFFFF"/>
+    <!-- 星光 -->
+    <path android:pathData="M34,33.5 C35.1,39.7 36.8,41.4 43,42.5 C36.8,43.6 35.1,45.3 34,51.5 C32.9,45.3 31.2,43.6 25,42.5 C31.2,41.4 32.9,39.7 34,33.5 Z"
         android:fillColor="#FFFFFFFF"/>
-    <!-- 小星光 -->
-    <path android:pathData="M34,33 C34.7,36.9 36.1,38.3 40,39 C36.1,39.7 34.7,41.1 34,45 C33.3,41.1 31.9,39.7 28,39 C31.9,38.3 33.3,36.9 34,33 Z"
-        android:fillColor="#D9FFFFFF"/>
 </vector>

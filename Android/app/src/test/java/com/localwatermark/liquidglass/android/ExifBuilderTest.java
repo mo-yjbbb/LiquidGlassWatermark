@@ -79,7 +79,7 @@ public final class ExifBuilderTest {
         assertEquals("2026:01:01 10:00:00", readBack.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL));
         assertEquals(400, readBack.getAttributeInt(ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY, -1));
         assertEquals("9/10", readBack.getAttribute(ExifInterface.TAG_F_NUMBER));
-        double[] latLng = new double[2];
+        float[] latLng = new float[2];
         assertTrue("GPS 应能读回", readBack.getLatLong(latLng));
         assertEquals(39.91, latLng[0], 0.01);
         assertEquals(116.39, latLng[1], 0.01);
@@ -125,8 +125,9 @@ public final class ExifBuilderTest {
         int len = 2 + header.length + xmp.getBytes(StandardCharsets.UTF_8).length;
         out.write(0xFF); out.write(0xE1);
         out.write((len >>> 8) & 255); out.write(len & 255);
+        byte[] xmpBytes = xmp.getBytes(StandardCharsets.UTF_8);
         out.write(header, 0, header.length);
-        out.write(xmp.getBytes(StandardCharsets.UTF_8), 0, xmp.length());
+        out.write(xmpBytes, 0, xmpBytes.length);
         out.write(0xFF); out.write(0xD9);
         assertEquals(xmp, MotionPhotoSupport.extractXmp(out.toByteArray()));
         assertNull(MotionPhotoSupport.extractXmp(minimalJpeg()));

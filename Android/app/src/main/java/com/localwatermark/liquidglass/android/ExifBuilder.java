@@ -32,15 +32,16 @@ final class ExifBuilder {
     static byte[] buildMotionJpeg(byte[] jpeg, ExifInterface src, long videoLength,
                                   long presentationTimestampUs, String originalXmp) {
         byte[] tiff = buildTiff(src, true);
-        String xmp = MotionPhotoSupport.motionXmp(jpeg.length, videoLength,
+        // XMP 里的 Primary Item 长度必须等于"注入元数据之后"的 JPEG 长度，而这个长度又受
+        // 该数字自身的位数影响，所以迭代到两者相等为止（最多差 1 字节，几轮必收敛）。
+        long stillLength = jpeg.length;
+        String xmp = MotionPhotoSupport.motionXmp(stillLength, videoLength,
                 presentationTimestampUs, originalXmp);
         byte[] result = inject(jpeg, tiff, xmp);
-        // 注入后 JPEG 实际长度与 XMP 里 Primary Item 长度互相影响，迭代到收敛
-        for (int i = 0; i < 4; i++) {
-            String fixed = MotionPhotoSupport.motionXmp(result.length, videoLength,
+        for (int i = 0; i < 8 && result.length != stillLength; i++) {
+            stillLength = result.length;
+            xmp = MotionPhotoSupport.motionXmp(stillLength, videoLength,
                     presentationTimestampUs, originalXmp);
-            if (fixed.equals(xmp)) break;
-            xmp = fixed;
             result = inject(jpeg, tiff, xmp);
         }
         return result;
@@ -70,17 +71,17 @@ final class ExifBuilder {
         if (focal35 > 0) exif.add(new Entry(0xA405, TYPE_SHORT, 1, shortBytes(focal35)));
         List<Entry> gps = buildGps(src);
 
-        ifd0.sort(Comparator.comparingInt(e -> e.tag));
-        exif.sort(Comparator.comparingInt(e -> e.tag));
+        ifd0.sort(Comparator.comparingInt((Entry e) -> e.tag));
+        exif.sort(Comparator.comparingInt((Entry e) -> e.tag));
 
         if (!exif.isEmpty()) {
             ifd0.add(new Entry(TAG_EXIF_IFD_POINTER, TYPE_LONG, 1, intBytes(0))); // 占位，稍后回填
         }
         if (!gps.isEmpty()) {
-            gps.sort(Comparator.comparingInt(e -> e.tag));
+            gps.sort(Comparator.comparingInt((Entry e) -> e.tag));
             ifd0.add(new Entry(TAG_GPS_IFD_POINTER, TYPE_LONG, 1, intBytes(0)));
         }
-        ifd0.sort(Comparator.comparingInt(e -> e.tag));
+        ifd0.sort(Comparator.comparingInt((Entry e) -> e.tag));
 
         int offset = 8;
         int ifd0Offset = offset;
@@ -109,12 +110,12 @@ final class ExifBuilder {
 
     private static List<Entry> buildGps(ExifInterface src) {
         List<Entry> gps = new ArrayList<>();
-        double[] latLng = new double[2];
+        float[] latLng = new float[2];
         boolean hasPosition = false;
         try { hasPosition = src.getLatLong(latLng); } catch (Throwable ignored) { }
-        if (!hasPosition || Double.isNaN(latLng[0]) || Double.isNaN(latLng[1])
+        if (!hasPosition || Float.isNaN(latLng[0]) || Float.isNaN(latLng[1])
                 || (latLng[0] == 0 && latLng[1] == 0)) return gps;
-        double lat = latLng[0], lon = latLng[1];
+        float lat = latLng[0], lon = latLng[1];
         gps.add(new Entry(0x0001, TYPE_ASCII, 2, asciiBytes(lat >= 0 ? "N" : "S")));
         gps.add(new Entry(0x0002, TYPE_RATIONAL, 3, dmsBytes(Math.abs(lat))));
         gps.add(new Entry(0x0003, TYPE_ASCII, 2, asciiBytes(lon >= 0 ? "E" : "W")));

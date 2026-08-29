@@ -84,8 +84,8 @@ final class MotionPhotoSupport {
                 + "Camera:MicroVideo=\"1\" Camera:MicroVideoVersion=\"1\" "
                 + "Camera:MicroVideoOffset=\"" + offset + "\" Camera:MicroVideoPresentationTimestampUs=\"" + ts + "\">"
                 + "<Container:Directory><rdf:Seq>"
-                + "<rdf:li rdf:parseType=\"Resource\"><Item:Item Item:Mime=\"image/jpeg\" Item:Semantic=\"Primary\" Item:Length=\"" + stillLength + "\"/></rdf:li>"
-                + "<rdf:li rdf:parseType=\"Resource\"><Item:Item Item:Mime=\"video/mp4\" Item:Semantic=\"MotionPhoto\" Item:Length=\"" + videoLength + "\"/></rdf:li>"
+                + "<rdf:li rdf:parseType=\"Resource\"><Container:Item Item:Mime=\"image/jpeg\" Item:Semantic=\"Primary\" Item:Length=\"" + stillLength + "\"/></rdf:li>"
+                + "<rdf:li rdf:parseType=\"Resource\"><Container:Item Item:Mime=\"video/mp4\" Item:Semantic=\"MotionPhoto\" Item:Length=\"" + videoLength + "\"/></rdf:li>"
                 + "</rdf:Seq></Container:Directory></rdf:Description></rdf:RDF></x:xmpmeta>";
     }
 

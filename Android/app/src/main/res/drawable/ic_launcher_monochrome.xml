@@ -1,10 +1,9 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <path android:pathData="M54,30 C62.5,43 77,48.5 77,61 A23,23 0 1,1 31,61 C31,48.5 45.5,43 54,30 Z"
+    <!-- 主题图标（HyperOS / Android 13+）：只保留单色轮廓，系统会自动着色 -->
+    <path android:pathData="M54,26 C64,41 78,47 78,62 A24,24 0 1,1 30,62 C30,47 44,41 54,26 Z"
         android:fillColor="#FFFFFFFF"/>
-    <path android:pathData="M79,78m-6.5,0a6.5,6.5 0 1,0 13,0a6.5,6.5 0 1,0 -13,0"
-        android:fillColor="#FFFFFFFF"/>
-    <path android:pathData="M74,27 C75.2,34.8 77.2,36.8 85,38 C77.2,39.2 75.2,41.2 74,49 C72.8,41.2 70.8,39.2 63,38 C70.8,36.8 72.8,34.8 74,27 Z"
+    <path android:pathData="M34,33.5 C35.1,39.7 36.8,41.4 43,42.5 C36.8,43.6 35.1,45.3 34,51.5 C32.9,45.3 31.2,43.6 25,42.5 C31.2,41.4 32.9,39.7 34,33.5 Z"
         android:fillColor="#FFFFFFFF"/>
 </vector>
