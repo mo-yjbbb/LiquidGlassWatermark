@@ -197,11 +197,11 @@ public final class MainActivity extends Activity {
                 byte[] still = java.nio.file.Files.readAllBytes(temp.toPath()); temp.delete();
                 byte[] result;
                 if (parts.motion) {
-                    byte[] stillWithMeta = ExifBuilder.buildMotionJpeg(still, exifFields,
+                    byte[] stillWithMeta = ExifBuilder.buildMotionJpeg(still, parts.imageBytes, exifFields,
                             renderedVideo.length, Math.max(presentationTs, 0), originalXmp);
                     result = MotionPhotoSupport.join(stillWithMeta, renderedVideo);
                 } else {
-                    result = ExifBuilder.buildStillJpeg(still, exifFields);
+                    result = ExifBuilder.buildStillJpeg(still, parts.imageBytes, exifFields);
                 }
                 if (parts.motion && !MotionPhotoSupport.hasVideo(result)) throw new IOException("动态照片视频资源校验失败");
                 finishedBytes = result; sourceWasMotion = parts.motion;

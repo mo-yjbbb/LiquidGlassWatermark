@@ -244,4 +244,68 @@ public final class ExifBuilderTest {
         assertEquals(xmp, MotionPhotoSupport.extractXmp(out.toByteArray()));
         assertNull(MotionPhotoSupport.extractXmp(minimalJpeg()));
     }
+
+    /** 核心场景：把原图 EXIF 整个继承过来（小米私有标签一条不丢），只补写 0x8897。 */
+    @Test public void inheritsOriginalExifAndAddsMotionTag() {
+        byte[] originalWithExif = ExifBuilder.buildStillJpeg(minimalJpeg(), sourceMetadata());
+        assertFalse("原静态图不应带动态标签", contains(originalWithExif, XIAOMI_MOTION_ENTRY));
+
+        byte[] out = ExifBuilder.buildMotionJpeg(minimalJpeg(), originalWithExif, sourceMetadata(),
+                12345, 500000, null);
+        assertTrue("继承路径下仍必须写出 0x8897", contains(out, XIAOMI_MOTION_ENTRY));
+
+        byte[] tiff = exifTiff(out);
+        assertNotNull(tiff);
+        assertEquals("Xiaomi", asciiTag(tiff, 0x010F));
+        assertEquals("23127PN0CC", asciiTag(tiff, 0x0110));
+        assertEquals("2026:01:01 10:00:00", asciiTag(tiff, 0x9003));
+        assertEquals(400, shortTag(tiff, 0x8827));
+        assertEquals(23, shortTag(tiff, 0xA405));
+        assertEquals(1, shortTag(tiff, 0x0112));
+        assertEquals(0.9, rationalTag(tiff, 0x829D, 0), 1e-6);
+        assertEquals(0.01, rationalTag(tiff, 0x829A, 0), 1e-6);
+        assertEquals(23.0, rationalTag(tiff, 0x920A, 0), 1e-6);
+        assertEquals("N", asciiTag(tiff, 0x0001));
+
+        String xmp = MotionPhotoSupport.extractXmp(out);
+        assertNotNull("继承路径下 XMP 仍要注入", xmp);
+        assertTrue(xmp.contains("MicroVideoOffset=\"12345\""));
+        assertTrue("Primary 长度应收敛到 " + out.length,
+                xmp.contains("Item:Length=\"" + out.length + "\""));
+    }
+
+    @Test public void stillJpegStripsMotionTagFromInheritedExif() {
+        byte[] motionJpeg = ExifBuilder.buildMotionJpeg(minimalJpeg(), sourceMetadata(),
+                12345, 500000, null);
+        assertTrue(contains(motionJpeg, XIAOMI_MOTION_ENTRY));
+
+        byte[] out = ExifBuilder.buildStillJpeg(minimalJpeg(), motionJpeg, sourceMetadata());
+        assertFalse("静态输出必须去掉 0x8897", contains(out, XIAOMI_MOTION_ENTRY));
+        assertNull("静态输出不应带 XMP", MotionPhotoSupport.extractXmp(out));
+        byte[] tiff = exifTiff(out);
+        assertNotNull(tiff);
+        assertEquals("其余元数据应保留", "Xiaomi", asciiTag(tiff, 0x010F));
+    }
+
+    /** 原图已带 0x8897 时（小米相机实况图的常态）应逐字节原样继承，不做任何重建。 */
+    @Test public void keepsOriginalTiffByteForByteWhenMotionTagAlreadyPresent() {
+        byte[] motionJpeg = ExifBuilder.buildMotionJpeg(minimalJpeg(), sourceMetadata(),
+                12345, 500000, null);
+        byte[] tiffBefore = exifTiff(motionJpeg);
+
+        byte[] out = ExifBuilder.buildMotionJpeg(minimalJpeg(), motionJpeg, sourceMetadata(),
+                9999, 700000, null);
+        assertArrayEquals("已有 0x8897 时 EXIF 应原样保留", tiffBefore, exifTiff(out));
+
+        String xmp = MotionPhotoSupport.extractXmp(out);
+        assertNotNull(xmp);
+        assertTrue("偏移仍要按新视频长度更新", xmp.contains("MicroVideoOffset=\"9999\""));
+        assertTrue(xmp.contains("MicroVideoPresentationTimestampUs=\"700000\""));
+    }
+
+    @Test public void inheritTiffRejectsJunkInput() {
+        assertNull(ExifBuilder.inheritTiff(null, true));
+        assertNull(ExifBuilder.inheritTiff(minimalJpeg(), true)); // 无 APP1 段
+        assertNull(ExifBuilder.inheritTiff(new byte[]{1, 2, 3}, true));
+    }
 }
