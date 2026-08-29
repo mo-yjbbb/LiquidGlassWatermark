@@ -79,13 +79,26 @@ public final class MainActivity extends Activity {
                 if (decoded == null) throw new IOException("无法解码照片");
                 Bitmap oriented = orient(decoded, originalExif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL));
                 Bitmap rendered = LiquidGlassRenderer.render(this, oriented, metadata);
+                byte[] renderedVideo = parts.videoBytes;
+                if (parts.motion) {
+                    File inputVideo = new File(getCacheDir(), "motion-in-" + System.nanoTime() + ".mp4");
+                    File outputVideo = new File(getCacheDir(), "motion-out-" + System.nanoTime() + ".mp4");
+                    try {
+                        try (OutputStream videoOut = new FileOutputStream(inputVideo)) { videoOut.write(parts.videoBytes); }
+                        MotionVideoRenderer.render(this, inputVideo, outputVideo,
+                                oriented.getWidth(), oriented.getHeight(), metadata);
+                        renderedVideo = java.nio.file.Files.readAllBytes(outputVideo.toPath());
+                    } finally {
+                        inputVideo.delete(); outputVideo.delete();
+                    }
+                }
                 File temp = new File(getCacheDir(), "watermarked-" + System.nanoTime() + ".jpg");
                 try (OutputStream out = new FileOutputStream(temp)) {
                     if (!rendered.compress(Bitmap.CompressFormat.JPEG, 100, out)) throw new IOException("JPEG 编码失败");
                 }
-                copyExif(originalExif, new ExifInterface(temp));
+                copyExif(originalExif, new ExifInterface(temp), parts.motion ? renderedVideo.length : 0);
                 byte[] still = java.nio.file.Files.readAllBytes(temp.toPath()); temp.delete();
-                byte[] result = parts.motion ? MotionPhotoSupport.join(still, parts.videoBytes) : still;
+                byte[] result = parts.motion ? MotionPhotoSupport.join(still, renderedVideo) : still;
                 if (parts.motion && !MotionPhotoSupport.hasVideo(result)) throw new IOException("动态照片视频资源校验失败");
                 finishedBytes = result; sourceWasMotion = parts.motion;
                 runOnUiThread(() -> {
@@ -109,7 +122,8 @@ public final class MainActivity extends Activity {
     private void saveNew() {
         worker.execute(() -> {
             try {
-                ContentValues values = new ContentValues(); values.put(MediaStore.Images.Media.DISPLAY_NAME, "LGW_" + System.currentTimeMillis() + ".jpg");
+                ContentValues values = new ContentValues(); values.put(MediaStore.Images.Media.DISPLAY_NAME,
+                        "LGW_" + System.currentTimeMillis() + (sourceWasMotion ? "_MP.jpg" : ".jpg"));
                 values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg"); values.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/LiquidGlassWatermark");
                 values.put(MediaStore.Images.Media.IS_PENDING, 1);
                 Uri output = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
@@ -139,9 +153,23 @@ public final class MainActivity extends Activity {
         if(m.isIdentity())return input; Bitmap out=Bitmap.createBitmap(input,0,0,input.getWidth(),input.getHeight(),m,true); if(out!=input)input.recycle(); return out;
     }
 
-    private static void copyExif(ExifInterface src, ExifInterface dst) throws IOException {
-        String[] tags={ExifInterface.TAG_MAKE,ExifInterface.TAG_MODEL,ExifInterface.TAG_DATETIME,ExifInterface.TAG_DATETIME_ORIGINAL,ExifInterface.TAG_DATETIME_DIGITIZED,ExifInterface.TAG_F_NUMBER,ExifInterface.TAG_EXPOSURE_TIME,ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY,ExifInterface.TAG_FOCAL_LENGTH,ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM,ExifInterface.TAG_GPS_LATITUDE,ExifInterface.TAG_GPS_LATITUDE_REF,ExifInterface.TAG_GPS_LONGITUDE,ExifInterface.TAG_GPS_LONGITUDE_REF,ExifInterface.TAG_GPS_ALTITUDE,ExifInterface.TAG_GPS_ALTITUDE_REF,ExifInterface.TAG_XMP};
-        for(String tag:tags){String value=src.getAttribute(tag);if(value!=null)dst.setAttribute(tag,value);} dst.setAttribute(ExifInterface.TAG_ORIENTATION,String.valueOf(ExifInterface.ORIENTATION_NORMAL)); dst.saveAttributes();
+    private static void copyExif(ExifInterface src, ExifInterface dst, int motionVideoLength) throws IOException {
+        String[] tags={ExifInterface.TAG_MAKE,ExifInterface.TAG_MODEL,ExifInterface.TAG_DATETIME,ExifInterface.TAG_DATETIME_ORIGINAL,ExifInterface.TAG_DATETIME_DIGITIZED,ExifInterface.TAG_F_NUMBER,ExifInterface.TAG_EXPOSURE_TIME,ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY,ExifInterface.TAG_FOCAL_LENGTH,ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM,ExifInterface.TAG_GPS_LATITUDE,ExifInterface.TAG_GPS_LATITUDE_REF,ExifInterface.TAG_GPS_LONGITUDE,ExifInterface.TAG_GPS_LONGITUDE_REF,ExifInterface.TAG_GPS_ALTITUDE,ExifInterface.TAG_GPS_ALTITUDE_REF};
+        for(String tag:tags){String value=src.getAttribute(tag);if(value!=null)dst.setAttribute(tag,value);}
+        if (motionVideoLength > 0) dst.setAttribute(ExifInterface.TAG_XMP, motionXmp(motionVideoLength));
+        dst.setAttribute(ExifInterface.TAG_ORIENTATION,String.valueOf(ExifInterface.ORIENTATION_NORMAL)); dst.saveAttributes();
+    }
+
+    private static String motionXmp(int videoLength) {
+        return "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">"
+                + "<rdf:Description xmlns:Camera=\"http://ns.google.com/photos/1.0/camera/\" "
+                + "Camera:MotionPhoto=\"1\" Camera:MotionPhotoVersion=\"1\" Camera:MotionPhotoPresentationTimestampUs=\"-1\" "
+                + "Camera:MicroVideo=\"1\" Camera:MicroVideoVersion=\"1\" Camera:MicroVideoOffset=\"" + videoLength + "\">"
+                + "<Container:Directory xmlns:Container=\"http://ns.google.com/photos/1.0/container/\" "
+                + "xmlns:Item=\"http://ns.google.com/photos/1.0/container/item/\"><rdf:Seq>"
+                + "<rdf:li rdf:parseType=\"Resource\"><Container:Item Item:Mime=\"image/jpeg\" Item:Semantic=\"Primary\"/></rdf:li>"
+                + "<rdf:li rdf:parseType=\"Resource\"><Container:Item Item:Mime=\"video/mp4\" Item:Semantic=\"MotionPhoto\" Item:Length=\"" + videoLength + "\"/></rdf:li>"
+                + "</rdf:Seq></Container:Directory></rdf:Description></rdf:RDF></x:xmpmeta>";
     }
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
     @Override protected void onDestroy(){super.onDestroy();worker.shutdownNow();}

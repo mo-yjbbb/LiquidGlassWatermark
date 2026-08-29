@@ -53,6 +53,18 @@ final class LiquidGlassRenderer {
         return out;
     }
 
+    static Bitmap createContentOverlay(Context context, int width, int height, PhotoMetadata meta) throws Exception {
+        Bitmap overlay = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(overlay);
+        float shortSide = Math.min(width, height);
+        float scale = Math.max(shortSide / 1080f, .35f);
+        float margin = Math.max(shortSide * .012f, 8 * scale);
+        float h = shortSide * .135f;
+        RectF capsule = new RectF(margin, height - margin - h, width - margin, height - margin);
+        drawTextAndLogo(context, canvas, capsule, h, meta);
+        return overlay;
+    }
+
     private static void drawLiquidMesh(Canvas canvas, Bitmap band, RectF rect, float h) {
         int cols = 56, rows = 10; float[] vertices = new float[(cols + 1) * (rows + 1) * 2];
         int k = 0;
@@ -61,8 +73,9 @@ final class LiquidGlassRenderer {
             for (int x = 0; x <= cols; x++) {
                 float u = x / (float) cols;
                 float envelope = (float)Math.sin(Math.PI * v);
-                float dx = (float)(Math.sin(u * Math.PI * 8 + v * 2.2) * h * .095 * envelope);
-                float dy = (float)((Math.sin(u * Math.PI * 3.2) * .22 + Math.cos(u * Math.PI * 6.0 + v) * .10) * h * envelope);
+                float endLens = (float)(Math.exp(-Math.pow(u / .115, 2)) - Math.exp(-Math.pow((u - 1) / .115, 2)));
+                float dx = (float)((Math.sin(u * Math.PI * 8 + v * 2.2) * .095 + endLens * .30) * h * envelope);
+                float dy = (float)((Math.sin(u * Math.PI * 3.2) * .22 + Math.cos(u * Math.PI * 6.0 + v) * .10) * h * .38 * envelope);
                 vertices[k++] = rect.left + u * rect.width() + dx;
                 vertices[k++] = rect.top + v * rect.height() + dy;
             }

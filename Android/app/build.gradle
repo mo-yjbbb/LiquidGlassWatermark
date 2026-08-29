@@ -25,5 +25,8 @@ android {
 dependencies {
     implementation "androidx.exifinterface:exifinterface:1.4.2"
     implementation "com.caverock:androidsvg-aar:1.4"
+    implementation "androidx.media3:media3-common:1.11.0"
+    implementation "androidx.media3:media3-effect:1.11.0"
+    implementation "androidx.media3:media3-transformer:1.11.0"
     testImplementation "junit:junit:4.13.2"
 }
