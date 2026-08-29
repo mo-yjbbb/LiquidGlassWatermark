@@ -6,6 +6,8 @@ import android.graphics.*;
 import android.net.Uri;
 import android.os.*;
 import android.provider.MediaStore;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
 import android.view.*;
 import android.widget.*;
 import androidx.exifinterface.media.ExifInterface;
@@ -23,24 +25,53 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(Color.rgb(9,10,16));
+        if (Build.VERSION.SDK_INT >= 30) getWindow().setDecorFitsSystemWindows(false);
         LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(18), dp(18), dp(18), dp(18)); root.setGravity(Gravity.CENTER_HORIZONTAL);
-        TextView title = new TextView(this); title.setText("液态玻璃水印 · 小米版"); title.setTextSize(24); title.setGravity(Gravity.CENTER);
+        root.setPadding(dp(20), dp(20), dp(20), dp(20)); root.setGravity(Gravity.CENTER_HORIZONTAL);
+        root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{0xff090a10,0xff161224,0xff241225}));
+        root.setOnApplyWindowInsetsListener((view, insets) -> {
+            android.graphics.Insets bars = Build.VERSION.SDK_INT >= 30
+                    ? insets.getInsets(WindowInsets.Type.systemBars())
+                    : android.graphics.Insets.of(0, insets.getSystemWindowInsetTop(), 0, insets.getSystemWindowInsetBottom());
+            view.setPadding(dp(20), bars.top + dp(18), dp(20), bars.bottom + dp(18));
+            return insets;
+        });
+        TextView title = new TextView(this); title.setText("液态玻璃水印"); title.setTextSize(27); title.setTextColor(Color.WHITE);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD); title.setGravity(Gravity.CENTER);
+        TextView subtitle = new TextView(this); subtitle.setText("小米 · 徕卡动态影像"); subtitle.setTextSize(14);
+        subtitle.setTextColor(0xbbffffff); subtitle.setGravity(Gravity.CENTER); subtitle.setPadding(0,dp(5),0,dp(16));
         preview = new ImageView(this); preview.setAdjustViewBounds(true); preview.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        GradientDrawable previewBg = new GradientDrawable(); previewBg.setColor(0x22000000); previewBg.setCornerRadius(dp(24));
+        previewBg.setStroke(dp(1),0x28ffffff); preview.setBackground(previewBg); preview.setPadding(dp(6),dp(6),dp(6),dp(6));
         progress = new ProgressBar(this); progress.setVisibility(View.GONE);
-        Button select = new Button(this); select.setText("选择照片 / 动态照片"); select.setOnClickListener(v -> pick());
+        Button select = new Button(this); select.setText("从相册选择照片"); select.setTextColor(Color.WHITE);
+        select.setTextSize(17); select.setAllCaps(false); select.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        GradientDrawable glassButton = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{0x58ffffff,0x22c9a8ff,0x33ff82a9});
+        glassButton.setCornerRadius(dp(30)); glassButton.setStroke(dp(1),0x88ffffff);
+        select.setBackground(glassButton); select.setElevation(dp(8)); select.setPadding(dp(24),dp(14),dp(24),dp(14));
+        select.setOnClickListener(v -> pick());
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
+        root.addView(subtitle, new LinearLayout.LayoutParams(-1, -2));
         root.addView(preview, new LinearLayout.LayoutParams(-1, 0, 1));
-        root.addView(progress); root.addView(select, new LinearLayout.LayoutParams(-1, -2)); setContentView(root);
+        root.addView(progress); LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(-1,-2);
+        buttonParams.topMargin=dp(12); root.addView(select, buttonParams); setContentView(root);
         handleIntent(getIntent());
     }
 
     @Override protected void onNewIntent(Intent intent) { super.onNewIntent(intent); setIntent(intent); handleIntent(intent); }
 
     private void pick() {
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("image/*")
-                .addCategory(Intent.CATEGORY_OPENABLE)
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        Intent intent;
+        if (Build.VERSION.SDK_INT >= 33) {
+            intent = new Intent(MediaStore.ACTION_PICK_IMAGES).setType("image/*");
+        } else {
+            intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI).setType("image/*");
+        }
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
         startActivityForResult(intent, PICK_IMAGE);
     }
 
