@@ -19,6 +19,8 @@ targets:
       - Intents
       - path: Resources/Assets.xcassets
         buildPhase: resources
+      - path: Resources/BrandAssets.xcassets
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.localwatermark.liquidglass
@@ -39,6 +41,8 @@ targets:
     sources:
       - ShareExtension
       - Core
+      - path: Resources/BrandAssets.xcassets
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.localwatermark.liquidglass.share
