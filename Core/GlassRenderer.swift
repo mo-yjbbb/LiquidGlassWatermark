@@ -439,7 +439,8 @@ private func brandMark(for device: String) -> BrandMark {
 
 private func brandAspectRatio(_ mark: BrandMark) -> CGFloat {
     switch mark {
-    case .apple, .leica, .camera, .honor: return 1
+    case .apple, .leica, .camera: return 1
+    case .honor: return 161.0 / 42.0
     case .hasselblad: return 1.28
     case .zeiss: return 1.05
     case .xmage: return 1.9
@@ -464,6 +465,10 @@ private func drawBrandMark(_ mark: BrandMark, in rect: CGRect, context ctx: CGCo
         let font = UIFont.systemFont(ofSize: rect.height * 0.83, weight: .medium)
         centeredText("", font: font, color: .white)
     case .leica:
+        if let suppliedLogo = UIImage(named: "LeicaLogo") {
+            suppliedLogo.draw(in: rect, blendMode: .normal, alpha: 1)
+            break
+        }
         let circle = CGRect(x: rect.midX - rect.height * 0.48,
                             y: rect.midY - rect.height * 0.48,
                             width: rect.height * 0.96, height: rect.height * 0.96)
@@ -518,6 +523,11 @@ private func drawBrandMark(_ mark: BrandMark, in rect: CGRect, context ctx: CGCo
                                                       weight: .medium),
                      color: UIColor(red: 0.96, green: 0.66, blue: 0.02, alpha: 1))
     case .honor:
+        if let suppliedLogo = UIImage(named: "HonorLogo") {
+            suppliedLogo.withTintColor(.white, renderingMode: .alwaysOriginal)
+                .draw(in: rect, blendMode: .normal, alpha: 1)
+            break
+        }
         let iconSize = rect.height * 0.84
         let icon = CGRect(x: rect.midX - iconSize * 0.5, y: rect.midY - iconSize * 0.5,
                           width: iconSize, height: iconSize)
