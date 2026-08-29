@@ -18,7 +18,7 @@ jobs:
           java-version: "17"
       - uses: android-actions/setup-android@v3
       - name: Install Android 17 SDK
-        run: yes | sdkmanager "platforms;android-37" "platform-tools"
+        run: yes | sdkmanager --channel=3 "platforms;android-37" "platform-tools"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.10.2"
