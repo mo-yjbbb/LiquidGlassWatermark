@@ -47,6 +47,16 @@ final class PhotoMetadata {
         return new PhotoMetadata(device, date, String.join("  ", parts), location);
     }
 
+    static PhotoMetadata empty() { return new PhotoMetadata("", "", "", ""); }
+
+    PhotoMetadata withFallback(PhotoMetadata other) {
+        return new PhotoMetadata(
+                device.isEmpty() ? other.device : device,
+                date.isEmpty() ? other.date : date,
+                exposure.isEmpty() ? other.exposure : exposure,
+                location.isEmpty() ? other.location : location);
+    }
+
     boolean usable() { return !device.isEmpty() || !date.isEmpty() || !exposure.isEmpty(); }
     boolean complete() { return !device.isEmpty() && !date.isEmpty() && !exposure.isEmpty() && !location.isEmpty(); }
     private static String clean(String value) { return value == null ? "" : value.trim(); }

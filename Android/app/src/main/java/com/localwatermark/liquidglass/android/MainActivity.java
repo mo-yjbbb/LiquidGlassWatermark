@@ -166,6 +166,7 @@ public final class MainActivity extends Activity {
             try {
                 byte[] all = readAll(uri); MotionPhotoSupport.Parts parts = MotionPhotoSupport.split(all);
                 PhotoMetadata metadata = PhotoMetadata.read(new ByteArrayInputStream(parts.imageBytes), queryDateTaken(uri));
+                if (hasMediaLocationPermission()) metadata = metadata.withFallback(readOriginalMetadata(uri, all));
                 if (!metadata.usable()) throw new IOException("照片内没有可用的拍摄参数（可能已被聊天软件压缩去除），无法生成水印");
                 ExifInterface originalExif = new ExifInterface(new ByteArrayInputStream(parts.imageBytes));
                 Bitmap decoded = BitmapFactory.decodeByteArray(parts.imageBytes, 0, parts.imageBytes.length);
@@ -199,10 +200,62 @@ public final class MainActivity extends Activity {
                     showSaveChoice();
                 });
             } catch (Throwable error) {
+                String detail = stackDetail(error);
+                try (Writer log = new java.io.FileWriter(new File(getCacheDir(), "last-error.txt"))) { log.write(detail); }
+                catch (Throwable ignored) { }
                 runOnUiThread(() -> { progress.setVisibility(View.GONE); emptyState.setVisibility(View.VISIBLE);
-                    Toast.makeText(this, friendlyMessage(error), Toast.LENGTH_LONG).show(); });
+                    showErrorDetail(friendlyMessage(error), detail); });
             }
         });
+    }
+
+    private void showErrorDetail(String summary, String detail) {
+        ScrollView scroll = new ScrollView(this);
+        TextView text = new TextView(this);
+        text.setText(detail); text.setTextSize(11); text.setTypeface(Typeface.MONOSPACE);
+        text.setPadding(dp(16), dp(12), dp(16), dp(12)); text.setTextIsSelectable(true);
+        scroll.addView(text);
+        new AlertDialog.Builder(this).setTitle(summary).setView(scroll)
+                .setPositiveButton("复制详情", (d, w) -> {
+                    android.content.ClipboardManager clipboard =
+                            (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("error", detail));
+                    Toast.makeText(this, "已复制，请发给开发者", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("关闭", null).show();
+    }
+
+    private static String stackDetail(Throwable error) {
+        StringBuilder sb = new StringBuilder();
+        Throwable current = error;
+        int depth = 0;
+        while (current != null && depth < 5) {
+            if (depth > 0) sb.append("\n原因 ").append(depth).append(":\n");
+            sb.append(current.getClass().getName()).append(": ").append(current.getMessage()).append("\n");
+            StackTraceElement[] frames = current.getStackTrace();
+            for (int i = 0; i < Math.min(frames.length, 12); i++) sb.append("  at ").append(frames[i]).append("\n");
+            current = current.getCause(); depth++;
+        }
+        return sb.toString();
+    }
+
+    private boolean hasMediaLocationPermission() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                && checkSelfPermission(android.Manifest.permission.ACCESS_MEDIA_LOCATION)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED;
+    }
+
+    private PhotoMetadata readOriginalMetadata(Uri uri, byte[] fallbackBytes) {
+        try {
+            byte[] bytes = fallbackBytes;
+            if (hasMediaLocationPermission()) {
+                try { bytes = readUriBytes(MediaStore.setRequireOriginal(uri)); } catch (Throwable ignored) { }
+            }
+            if (bytes == null || bytes.length == 0) bytes = fallbackBytes;
+            return PhotoMetadata.read(new ByteArrayInputStream(MotionPhotoSupport.split(bytes).imageBytes), "");
+        } catch (Throwable ignored) {
+            return PhotoMetadata.empty();
+        }
     }
 
     private static String friendlyMessage(Throwable error) {
@@ -262,15 +315,12 @@ public final class MainActivity extends Activity {
     private void notifyError(Throwable e) { runOnUiThread(() -> Toast.makeText(this, "保存失败：" + e.getMessage(), Toast.LENGTH_LONG).show()); }
     private void write(Uri uri, byte[] bytes) throws IOException { try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("没有写入权限");out.write(bytes);} }
     private byte[] readAll(Uri uri) throws IOException {
-        boolean hasMediaLocation = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
-                && checkSelfPermission(android.Manifest.permission.ACCESS_MEDIA_LOCATION)
-                == android.content.pm.PackageManager.PERMISSION_GRANTED;
         java.util.List<Uri> candidates = new java.util.ArrayList<>(2);
-        if (hasMediaLocation) {
+        candidates.add(uri);
+        if (hasMediaLocationPermission()) {
             try { Uri original = MediaStore.setRequireOriginal(uri); if (!candidates.contains(original)) candidates.add(original); }
             catch (Throwable ignored) { }
         }
-        if (!candidates.contains(uri)) candidates.add(uri);
         IOException last = null;
         for (Uri candidate : candidates) {
             try {
@@ -281,17 +331,36 @@ public final class MainActivity extends Activity {
                 last = error instanceof IOException ? (IOException) error : new IOException(error.getMessage(), error);
             }
         }
-        throw new IOException("无法读取照片：系统拒绝了访问（" + (last == null ? "未知原因" : last.getMessage())
-                + "）。请返回后重新从相册选择照片", last);
+        throw new IOException("无法读取照片：" + (last == null ? "未知原因" : last.toString()), last);
     }
 
     private byte[] readUriBytes(Uri uri) throws IOException {
-        try (InputStream in = getContentResolver().openInputStream(uri); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            if (in == null) throw new IOException("无法打开照片流");
+        IOException streamError = null;
+        try {
+            byte[] data = slurp(getContentResolver().openInputStream(uri));
+            if (data.length > 0) return data;
+        } catch (IOException | SecurityException | IllegalArgumentException | IllegalStateException error) {
+            streamError = error instanceof IOException ? (IOException) error : new IOException(error.getMessage(), error);
+        }
+        try (android.content.res.AssetFileDescriptor descriptor = getContentResolver().openAssetFileDescriptor(uri, "r")) {
+            if (descriptor != null) {
+                try (InputStream in = descriptor.createInputStream()) {
+                    byte[] data = slurp(in);
+                    if (data.length > 0) return data;
+                }
+            }
+        } catch (IOException | SecurityException | IllegalArgumentException | IllegalStateException ignored) { }
+        if (streamError != null) throw streamError;
+        throw new IOException("照片内容为空");
+    }
+
+    private static byte[] slurp(InputStream in) throws IOException {
+        if (in == null) throw new IOException("无法打开照片流");
+        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             byte[] b = new byte[131072];
             for (int n; (n = in.read(b)) >= 0;) out.write(b, 0, n);
             return out.toByteArray();
-        }
+        } finally { try { in.close(); } catch (Throwable ignored) { } }
     }
 
     private String queryDateTaken(Uri uri) {
