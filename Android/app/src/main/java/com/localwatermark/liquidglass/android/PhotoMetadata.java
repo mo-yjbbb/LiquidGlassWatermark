@@ -14,7 +14,7 @@ final class PhotoMetadata {
         this.device = device; this.date = date; this.exposure = exposure; this.location = location;
     }
 
-    static PhotoMetadata read(InputStream stream) throws IOException {
+    static PhotoMetadata read(InputStream stream, String fallbackDate) throws IOException {
         ExifInterface exif = new ExifInterface(stream);
         String make = clean(exif.getAttribute(ExifInterface.TAG_MAKE));
         String model = clean(exif.getAttribute(ExifInterface.TAG_MODEL));
@@ -24,6 +24,7 @@ final class PhotoMetadata {
         }
         String date = first(exif, ExifInterface.TAG_DATETIME_ORIGINAL,
                 ExifInterface.TAG_DATETIME_DIGITIZED, ExifInterface.TAG_DATETIME);
+        if (date.isEmpty()) date = clean(fallbackDate);
         if (date.length() >= 10) date = date.substring(0, 10).replace(':', '.') + date.substring(10);
 
         List<String> parts = new ArrayList<>();
@@ -46,6 +47,7 @@ final class PhotoMetadata {
         return new PhotoMetadata(device, date, String.join("  ", parts), location);
     }
 
+    boolean usable() { return !device.isEmpty() || !date.isEmpty() || !exposure.isEmpty(); }
     boolean complete() { return !device.isEmpty() && !date.isEmpty() && !exposure.isEmpty() && !location.isEmpty(); }
     private static String clean(String value) { return value == null ? "" : value.trim(); }
     private static String first(ExifInterface exif, String... tags) {

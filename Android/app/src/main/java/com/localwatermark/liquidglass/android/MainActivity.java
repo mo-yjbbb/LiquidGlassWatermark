@@ -110,7 +110,14 @@ public final class MainActivity extends Activity {
             intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI).setType("image/*");
         }
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-        startActivityForResult(intent, PICK_IMAGE);
+        try {
+            startActivityForResult(intent, PICK_IMAGE);
+        } catch (android.content.ActivityNotFoundException pickerMissing) {
+            Intent fallback = new Intent(Intent.ACTION_GET_CONTENT).setType("image/*")
+                    .addCategory(Intent.CATEGORY_OPENABLE)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivityForResult(fallback, PICK_IMAGE);
+        }
     }
 
     private void handleIntent(Intent intent) {
@@ -158,8 +165,8 @@ public final class MainActivity extends Activity {
         worker.execute(() -> {
             try {
                 byte[] all = readAll(uri); MotionPhotoSupport.Parts parts = MotionPhotoSupport.split(all);
-                PhotoMetadata metadata = PhotoMetadata.read(new ByteArrayInputStream(parts.imageBytes));
-                if (!metadata.complete()) throw new IOException("照片缺少机型、日期、拍摄参数或经纬度，不能添加水印");
+                PhotoMetadata metadata = PhotoMetadata.read(new ByteArrayInputStream(parts.imageBytes), queryDateTaken(uri));
+                if (!metadata.usable()) throw new IOException("照片内没有可用的拍摄参数（可能已被聊天软件压缩去除），无法生成水印");
                 ExifInterface originalExif = new ExifInterface(new ByteArrayInputStream(parts.imageBytes));
                 Bitmap decoded = BitmapFactory.decodeByteArray(parts.imageBytes, 0, parts.imageBytes.length);
                 if (decoded == null) throw new IOException("无法解码照片");
@@ -193,9 +200,21 @@ public final class MainActivity extends Activity {
                 });
             } catch (Throwable error) {
                 runOnUiThread(() -> { progress.setVisibility(View.GONE); emptyState.setVisibility(View.VISIBLE);
-                    Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show(); });
+                    Toast.makeText(this, friendlyMessage(error), Toast.LENGTH_LONG).show(); });
             }
         });
+    }
+
+    private static String friendlyMessage(Throwable error) {
+        if (error instanceof SecurityException) return "系统拒绝了照片访问权限，请返回后重新从相册选择照片";
+        if (error instanceof java.io.FileNotFoundException) return "找不到照片文件，照片可能已被移动或删除";
+        String message = error.getMessage();
+        if (message == null || message.trim().isEmpty()) return "处理失败：" + error.getClass().getSimpleName();
+        if (message.contains("content://") || message.toLowerCase(java.util.Locale.ROOT).contains("uri")
+                || message.toLowerCase(java.util.Locale.ROOT).contains("url")) {
+            return "照片访问被系统限制，请返回后重新从相册选择照片";
+        }
+        return message;
     }
 
     private void showSaveChoice() {
@@ -222,7 +241,16 @@ public final class MainActivity extends Activity {
     }
 
     private void overwrite() {
-        worker.execute(() -> { try { write(sourceUri, finishedBytes); verifyAndNotify(sourceUri); } catch (Throwable e) { notifyError(e); } });
+        worker.execute(() -> {
+            try { write(sourceUri, finishedBytes); verifyAndNotify(sourceUri); }
+            catch (Throwable e) {
+                if (e instanceof SecurityException || e instanceof IllegalArgumentException) {
+                    runOnUiThread(() -> Toast.makeText(this,
+                            "该照片来自受限相册无法覆盖，已改为保存新照片", Toast.LENGTH_LONG).show());
+                    saveNew();
+                } else notifyError(e);
+            }
+        });
     }
 
     private void verifyAndNotify(Uri uri) throws IOException {
@@ -234,16 +262,51 @@ public final class MainActivity extends Activity {
     private void notifyError(Throwable e) { runOnUiThread(() -> Toast.makeText(this, "保存失败：" + e.getMessage(), Toast.LENGTH_LONG).show()); }
     private void write(Uri uri, byte[] bytes) throws IOException { try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("没有写入权限");out.write(bytes);} }
     private byte[] readAll(Uri uri) throws IOException {
-        Uri readable = uri;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+        boolean hasMediaLocation = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
                 && checkSelfPermission(android.Manifest.permission.ACCESS_MEDIA_LOCATION)
-                == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            try { readable = MediaStore.setRequireOriginal(uri); } catch (Throwable ignored) { readable = uri; }
+                == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        java.util.List<Uri> candidates = new java.util.ArrayList<>(2);
+        if (hasMediaLocation) {
+            try { Uri original = MediaStore.setRequireOriginal(uri); if (!candidates.contains(original)) candidates.add(original); }
+            catch (Throwable ignored) { }
         }
-        try(InputStream in=getContentResolver().openInputStream(readable); ByteArrayOutputStream out=new ByteArrayOutputStream()){
-            if(in==null)throw new IOException("无法读取照片");byte[] b=new byte[131072];
-            for(int n;(n=in.read(b))>=0;)out.write(b,0,n);return out.toByteArray();
+        if (!candidates.contains(uri)) candidates.add(uri);
+        IOException last = null;
+        for (Uri candidate : candidates) {
+            try {
+                byte[] data = readUriBytes(candidate);
+                if (data.length > 0) return data;
+                last = new IOException("照片内容为空");
+            } catch (IOException | SecurityException | IllegalArgumentException | IllegalStateException error) {
+                last = error instanceof IOException ? (IOException) error : new IOException(error.getMessage(), error);
+            }
         }
+        throw new IOException("无法读取照片：系统拒绝了访问（" + (last == null ? "未知原因" : last.getMessage())
+                + "）。请返回后重新从相册选择照片", last);
+    }
+
+    private byte[] readUriBytes(Uri uri) throws IOException {
+        try (InputStream in = getContentResolver().openInputStream(uri); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            if (in == null) throw new IOException("无法打开照片流");
+            byte[] b = new byte[131072];
+            for (int n; (n = in.read(b)) >= 0;) out.write(b, 0, n);
+            return out.toByteArray();
+        }
+    }
+
+    private String queryDateTaken(Uri uri) {
+        if (uri == null) return "";
+        try (android.database.Cursor cursor = getContentResolver().query(uri,
+                new String[]{MediaStore.Images.Media.DATE_TAKEN}, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst() && !cursor.isNull(0)) {
+                long taken = cursor.getLong(0);
+                if (taken > 0) {
+                    java.text.SimpleDateFormat format = new java.text.SimpleDateFormat("yyyy:MM:dd HH:mm", java.util.Locale.US);
+                    return format.format(new java.util.Date(taken));
+                }
+            }
+        } catch (Throwable ignored) { }
+        return "";
     }
 
     private static Bitmap orient(Bitmap input, int orientation) {
