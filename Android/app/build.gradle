@@ -1,0 +1,29 @@
+plugins { id "com.android.application" }
+
+android {
+    namespace "com.localwatermark.liquidglass.android"
+    compileSdk 37
+
+    defaultConfig {
+        applicationId "com.localwatermark.liquidglass.android"
+        minSdk 29
+        targetSdk 37
+        versionCode 1
+        versionName "1.0-xiaomi"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation "androidx.exifinterface:exifinterface:1.4.2"
+    implementation "com.caverock:androidsvg-aar:1.4"
+    testImplementation "junit:junit:4.13.2"
+}
