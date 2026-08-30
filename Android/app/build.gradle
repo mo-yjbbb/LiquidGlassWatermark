@@ -8,8 +8,8 @@ android {
         applicationId "com.localwatermark.liquidglass.android"
         minSdk 29
         targetSdk 37
-        versionCode 13
-        versionName "2.1.1-copyright"
+        versionCode 14
+        versionName "2.2-glass-dialog"
     }
     buildTypes {
         release {
