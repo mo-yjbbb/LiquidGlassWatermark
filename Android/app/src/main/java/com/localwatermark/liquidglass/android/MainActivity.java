@@ -396,13 +396,81 @@ public final class MainActivity extends Activity {
     }
 
     private void showSaveChoice() {
-        new AlertDialog.Builder(this).setTitle(sourceWasMotion ? "动态照片处理完成" : "照片处理完成")
-                .setMessage(sourceWasMotion
-                        ? "液态玻璃动态水印已合成，保存后在小米相册长按或下拉即可播放动态效果。"
-                        : "已生成静态液态玻璃水印照片。\n提示：如果这张原本是动态照片，请直接在系统相册中选择（不要从微信/QQ等应用转发），否则动态视频数据会丢失。")
-                .setPositiveButton("保存新图", (d,w) -> saveNew())
-                .setNegativeButton("覆盖原图", (d,w) -> overwrite())
-                .setNeutralButton("取消", null).show();
+        final Dialog dialog=new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setCanceledOnTouchOutside(true);
+
+        LinearLayout panel=new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setGravity(Gravity.CENTER_HORIZONTAL);
+        panel.setPadding(dp(24),dp(24),dp(24),dp(18));
+        panel.setBackground(new LiquidUiDrawable(LiquidUiDrawable.PANEL));
+        panel.setElevation(dp(18));
+
+        TextView badge=label(sourceWasMotion ? "◉  MOTION READY" : "✓  PHOTO READY",
+                11,0xd8ffffff,Typeface.BOLD);
+        badge.setLetterSpacing(.10f); badge.setGravity(Gravity.CENTER);
+        badge.setBackground(new LiquidUiDrawable(LiquidUiDrawable.CHIP));
+        badge.setPadding(dp(15),0,dp(15),0);
+        panel.addView(badge,new LinearLayout.LayoutParams(-2,dp(34)));
+
+        TextView title=label(sourceWasMotion ? "动态照片处理完成" : "照片处理完成",
+                22,Color.WHITE,Typeface.BOLD);
+        title.setGravity(Gravity.CENTER); title.setPadding(0,dp(19),0,0);
+        panel.addView(title);
+
+        String description=sourceWasMotion
+                ? "液态玻璃效果已逐帧合成\n请选择保存为新图，或覆盖原始动态照片"
+                : "液态玻璃水印已经生成\n请选择保存方式";
+        TextView message=label(description,14,0xa8ffffff,Typeface.NORMAL);
+        message.setGravity(Gravity.CENTER); message.setLineSpacing(dp(4),1f);
+        message.setPadding(dp(4),dp(10),dp(4),dp(21));
+        panel.addView(message,new LinearLayout.LayoutParams(-1,-2));
+
+        TextView save=dialogButton("保存新图",true);
+        save.setOnClickListener(view->{dialog.dismiss();saveNew();});
+        panel.addView(save,new LinearLayout.LayoutParams(-1,dp(56)));
+
+        TextView overwrite=dialogButton("覆盖原图",false);
+        overwrite.setOnClickListener(view->{dialog.dismiss();overwrite();});
+        LinearLayout.LayoutParams overwriteParams=new LinearLayout.LayoutParams(-1,dp(50));
+        overwriteParams.topMargin=dp(10);
+        panel.addView(overwrite,overwriteParams);
+
+        TextView cancel=label("取消",14,0x92ffffff,Typeface.BOLD);
+        cancel.setGravity(Gravity.CENTER); cancel.setClickable(true); cancel.setFocusable(true);
+        cancel.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(0x22ffffff),null,null));
+        cancel.setOnClickListener(view->dialog.dismiss());
+        LinearLayout.LayoutParams cancelParams=new LinearLayout.LayoutParams(-1,dp(44));
+        cancelParams.topMargin=dp(4);
+        panel.addView(cancel,cancelParams);
+
+        FrameLayout shell=new FrameLayout(this);
+        shell.setPadding(dp(22),dp(22),dp(22),dp(22));
+        shell.addView(panel,new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER));
+        dialog.setContentView(shell);
+        Window window=dialog.getWindow();
+        if(window!=null){
+            window.setBackgroundDrawableResource(android.R.color.transparent);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams attributes=window.getAttributes();
+            attributes.dimAmount=.72f; window.setAttributes(attributes);
+        }
+        dialog.show();
+        if(dialog.getWindow()!=null) dialog.getWindow().setLayout(
+                WindowManager.LayoutParams.MATCH_PARENT,WindowManager.LayoutParams.WRAP_CONTENT);
+    }
+
+    private TextView dialogButton(String text,boolean primary){
+        TextView button=label(text,primary?16:15,Color.WHITE,Typeface.BOLD);
+        button.setGravity(Gravity.CENTER); button.setClickable(true); button.setFocusable(true);
+        android.graphics.drawable.Drawable surface=new LiquidUiDrawable(
+                primary?LiquidUiDrawable.BUTTON:LiquidUiDrawable.CHIP);
+        button.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(0x38ffffff),surface,null));
+        if(primary) button.setElevation(dp(7));
+        return button;
     }
 
     private void saveNew() {
