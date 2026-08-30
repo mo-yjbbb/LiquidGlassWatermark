@@ -8,8 +8,8 @@ android {
         applicationId "com.localwatermark.liquidglass.android"
         minSdk 29
         targetSdk 37
-        versionCode 21
-        versionName "2.7-overwrite-honor"
+        versionCode 22
+        versionName "2.8-media-original-fix"
     }
     buildTypes {
         release {
