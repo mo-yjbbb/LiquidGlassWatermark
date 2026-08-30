@@ -26,6 +26,10 @@ public final class MainActivity extends Activity {
     private boolean openPickerAfterPermission;
     private Uri pendingSharedUri;
 
+    private static final class MissingMetadataException extends IOException {
+        MissingMetadataException(String message) { super(message); }
+    }
+
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         getWindow().setStatusBarColor(Color.TRANSPARENT);
@@ -284,7 +288,7 @@ public final class MainActivity extends Activity {
                 if (metadata.location.isEmpty() && hasMediaLocationPermission()) {
                     metadata = metadata.withFallback(readOriginalMetadata(uri, all));
                 }
-                if (!metadata.usable()) throw new IOException("照片内没有可用的拍摄参数（可能已被聊天软件压缩去除），无法生成水印");
+                if (!metadata.complete()) throw new MissingMetadataException("无法读取完整的照片信息，缺少：" + metadata.missingFields() + "。\n这张图片不能制作水印。");
                 ExifInterface originalExif = new ExifInterface(new ByteArrayInputStream(parts.imageBytes));
                 ExifBuilder.Fields exifFields = ExifFields.from(originalExif);
                 String originalXmp = MotionPhotoSupport.extractXmp(parts.imageBytes);
@@ -330,10 +334,61 @@ public final class MainActivity extends Activity {
                 String detail = stackDetail(error);
                 try (Writer log = new java.io.FileWriter(new File(getCacheDir(), "last-error.txt"))) { log.write(detail); }
                 catch (Throwable ignored) { }
-                runOnUiThread(() -> { progress.setVisibility(View.GONE); emptyState.setVisibility(View.VISIBLE);
-                    showErrorDetail(friendlyMessage(error), detail); });
+                runOnUiThread(() -> {
+                    progress.setVisibility(View.GONE);
+                    emptyState.setVisibility(View.VISIBLE);
+                    if (error instanceof MissingMetadataException) {
+                        showMetadataUnavailable(error.getMessage());
+                    } else {
+                        showErrorDetail(friendlyMessage(error), detail);
+                    }
+                });
             }
         });
+    }
+
+    private void showMetadataUnavailable(String message) {
+        final Dialog dialog=new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        LinearLayout panel=new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setGravity(Gravity.CENTER_HORIZONTAL);
+        panel.setPadding(dp(24),dp(24),dp(24),dp(20));
+        panel.setBackground(new LiquidUiDrawable(LiquidUiDrawable.PANEL));
+
+        TextView badge=label("!  METADATA",11,0xffffd7df,Typeface.BOLD);
+        badge.setLetterSpacing(.10f); badge.setGravity(Gravity.CENTER);
+        badge.setBackground(new LiquidUiDrawable(LiquidUiDrawable.CHIP));
+        badge.setPadding(dp(15),0,dp(15),0);
+        panel.addView(badge,new LinearLayout.LayoutParams(-2,dp(34)));
+
+        TextView title=label("无法制作水印",21,Color.WHITE,Typeface.BOLD);
+        title.setGravity(Gravity.CENTER); title.setPadding(0,dp(18),0,0);
+        panel.addView(title);
+
+        TextView description=label(message,14,0xb8ffffff,Typeface.NORMAL);
+        description.setGravity(Gravity.CENTER); description.setLineSpacing(dp(4),1f);
+        description.setPadding(dp(3),dp(11),dp(3),dp(20));
+        panel.addView(description,new LinearLayout.LayoutParams(-1,-2));
+
+        TextView close=dialogButton("我知道了",true);
+        close.setOnClickListener(view->dialog.dismiss());
+        panel.addView(close,new LinearLayout.LayoutParams(-1,dp(54)));
+
+        FrameLayout shell=new FrameLayout(this);
+        shell.setPadding(dp(22),dp(22),dp(22),dp(22));
+        shell.addView(panel,new FrameLayout.LayoutParams(-1,-2,Gravity.CENTER));
+        dialog.setContentView(shell);
+        Window window=dialog.getWindow();
+        if(window!=null){
+            window.setBackgroundDrawableResource(android.R.color.transparent);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams attributes=window.getAttributes();
+            attributes.dimAmount=.72f; window.setAttributes(attributes);
+        }
+        dialog.show();
+        if(dialog.getWindow()!=null) dialog.getWindow().setLayout(
+                WindowManager.LayoutParams.MATCH_PARENT,WindowManager.LayoutParams.WRAP_CONTENT);
     }
 
     private void showErrorDetail(String summary, String detail) {
