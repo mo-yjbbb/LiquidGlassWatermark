@@ -217,23 +217,19 @@ public final class MainActivity extends Activity {
     }
 
     private void openGallery() {
-        Intent intent;
-        if (Build.VERSION.SDK_INT >= 33) {
-            // 刻意不用 ACTION_PICK_IMAGES：系统 Photo Picker 为了保护隐私会剥离
-            // EXIF 里的经纬度，且不支持 setRequireOriginal，本应用就拿不到相机
-            // 原始字节（位置、私有动态照片标签全丢）。走传统选择器保住这些数据。
-            intent = new Intent(Intent.ACTION_GET_CONTENT).setType("image/*")
-                    .addCategory(Intent.CATEGORY_OPENABLE);
-        } else {
-            intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI).setType("image/*");
-        }
+        // 必须直接选择 MediaStore 原始条目。ACTION_GET_CONTENT / Photo Picker
+        // 在部分 Android / 荣耀系统会返回转换后的临时 URI：既不可覆盖，也会
+        // 剥离动态照片尾部的配对视频。
+        Intent intent = new Intent(Intent.ACTION_PICK,
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI).setType("image/*");
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
         try {
             startActivityForResult(intent, PICK_IMAGE);
         } catch (android.content.ActivityNotFoundException pickerMissing) {
-            Intent fallback = new Intent(Intent.ACTION_GET_CONTENT).setType("image/*")
+            Intent fallback = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                    .setType("image/*")
                     .addCategory(Intent.CATEGORY_OPENABLE)
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
             startActivityForResult(fallback, PICK_IMAGE);
         }
     }
@@ -561,11 +557,7 @@ public final class MainActivity extends Activity {
             return;
         }
         Uri target = resolveWritableSource(sourceUri);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && isMediaStoreUri(target)) {
-            requestOverwritePermission(target);
-        } else {
-            performOverwrite(target);
-        }
+        performOverwrite(target);
     }
 
     private void requestOverwritePermission(Uri target) {
@@ -587,7 +579,13 @@ public final class MainActivity extends Activity {
                 write(target, finishedBytes);
                 verifyAndNotify(target);
             } catch (Throwable error) {
-                if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q
+                boolean protectedMedia = error instanceof SecurityException
+                        || error instanceof android.app.RecoverableSecurityException
+                        || (error.getCause() instanceof SecurityException);
+                if (protectedMedia && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                        && isMediaStoreUri(target)) {
+                    runOnUiThread(() -> requestOverwritePermission(target));
+                } else if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q
                         && error instanceof android.app.RecoverableSecurityException) {
                     android.app.PendingIntent permission =
                             ((android.app.RecoverableSecurityException)error).getUserAction().getActionIntent();
@@ -602,7 +600,7 @@ public final class MainActivity extends Activity {
                         }
                     });
                 } else {
-                    notifyError(new IOException("无法覆盖所选原图，请确认系统修改授权", error));
+                    notifyError(new IOException("无法覆盖原图；请重新从应用内的系统相册选择照片", error));
                 }
             }
         });
@@ -616,6 +614,9 @@ public final class MainActivity extends Activity {
                 String[] parts = documentId.split(":");
                 if (parts.length == 2 && "image".equalsIgnoreCase(parts[0])) {
                     long id = Long.parseLong(parts[1]);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        return MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL, id);
+                    }
                     return ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id);
                 }
             }
