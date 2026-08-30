@@ -59,6 +59,15 @@ final class PhotoMetadata {
 
     boolean usable() { return !device.isEmpty() || !date.isEmpty() || !exposure.isEmpty(); }
     boolean complete() { return !device.isEmpty() && !date.isEmpty() && !exposure.isEmpty() && !location.isEmpty(); }
+
+    String missingFields() {
+        List<String> missing = new ArrayList<>();
+        if (device.isEmpty()) missing.add("机型");
+        if (date.isEmpty()) missing.add("拍摄日期");
+        if (exposure.isEmpty()) missing.add("拍摄参数");
+        if (location.isEmpty()) missing.add("经纬度");
+        return String.join("、", missing);
+    }
     private static String clean(String value) { return value == null ? "" : value.trim(); }
     private static String first(ExifInterface exif, String... tags) {
         for (String tag : tags) { String value = clean(exif.getAttribute(tag)); if (!value.isEmpty()) return value; }
