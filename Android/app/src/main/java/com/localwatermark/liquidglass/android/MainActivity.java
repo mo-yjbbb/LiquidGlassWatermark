@@ -44,7 +44,7 @@ public final class MainActivity extends Activity {
         });
         LinearLayout header = new LinearLayout(this); header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL); header.setPadding(dp(2),0,0,dp(18));
-        ImageView brandIcon = new ImageView(this); brandIcon.setImageResource(R.drawable.ic_launcher_legacy);
+        ImageView brandIcon = new ImageView(this); brandIcon.setImageResource(R.drawable.app_icon);
         GradientDrawable iconPlate = new GradientDrawable(); iconPlate.setColor(0x18ffffff); iconPlate.setCornerRadius(dp(16));
         iconPlate.setStroke(dp(1),0x30ffffff); brandIcon.setBackground(iconPlate); brandIcon.setPadding(dp(5),dp(5),dp(5),dp(5));
         LinearLayout heading = new LinearLayout(this); heading.setOrientation(LinearLayout.VERTICAL); heading.setPadding(dp(13),0,0,0);
@@ -65,7 +65,7 @@ public final class MainActivity extends Activity {
         previewCard.addView(preview,new FrameLayout.LayoutParams(-1,-1));
         LinearLayout empty = new LinearLayout(this); empty.setOrientation(LinearLayout.VERTICAL); empty.setGravity(Gravity.CENTER);
         empty.setPadding(dp(26),dp(28),dp(26),dp(28));
-        ImageView emptyIcon = new ImageView(this); emptyIcon.setImageResource(R.drawable.ic_launcher_legacy); emptyIcon.setAlpha(.92f);
+        ImageView emptyIcon = new ImageView(this); emptyIcon.setImageResource(R.drawable.app_icon); emptyIcon.setAlpha(.92f);
         TextView emptyTitle = new TextView(this); emptyTitle.setText("选择一张照片开始"); emptyTitle.setTextColor(Color.WHITE);
         emptyTitle.setTextSize(20); emptyTitle.setTypeface(Typeface.DEFAULT,Typeface.BOLD); emptyTitle.setGravity(Gravity.CENTER);
         emptyTitle.setPadding(0,dp(16),0,dp(7));
