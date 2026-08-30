@@ -87,7 +87,11 @@ public final class MainActivity extends Activity {
         preview = new ImageView(this);
         preview.setScaleType(ImageView.ScaleType.FIT_CENTER);
         preview.setAdjustViewBounds(true);
-        preview.setBackgroundColor(0x16000000);
+        GradientDrawable previewSurface=new GradientDrawable();
+        previewSurface.setColor(0x16000000);
+        previewSurface.setCornerRadius(dp(22));
+        preview.setBackground(previewSurface);
+        preview.setClipToOutline(true);
         previewCard.addView(preview,new FrameLayout.LayoutParams(-1,-1));
 
         LinearLayout empty = new LinearLayout(this);
