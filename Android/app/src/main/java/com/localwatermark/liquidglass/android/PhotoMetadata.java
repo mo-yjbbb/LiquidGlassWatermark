@@ -18,8 +18,8 @@ final class PhotoMetadata {
         ExifInterface exif = new ExifInterface(stream);
         String make = clean(exif.getAttribute(ExifInterface.TAG_MAKE));
         String model = clean(exif.getAttribute(ExifInterface.TAG_MODEL));
-        String device = model;
-        if (!make.isEmpty() && !model.toLowerCase(Locale.ROOT).startsWith(make.toLowerCase(Locale.ROOT))) {
+        String device = displayDevice(make, model);
+        if (device.equals(model) && !make.isEmpty() && !model.toLowerCase(Locale.ROOT).startsWith(make.toLowerCase(Locale.ROOT))) {
             device = make + " " + model;
         }
         String date = first(exif, ExifInterface.TAG_DATETIME_ORIGINAL,
@@ -68,6 +68,17 @@ final class PhotoMetadata {
         if (location.isEmpty()) missing.add("经纬度");
         return String.join("、", missing);
     }
+    boolean isHonor() {
+        String value = device.toLowerCase(Locale.ROOT);
+        return value.contains("honor") || value.contains("荣耀") || value.contains("aak-an00");
+    }
+
+    private static String displayDevice(String make, String model) {
+        String joined = (make + " " + model).toLowerCase(Locale.ROOT);
+        if (joined.contains("aak-an00")) return "HONOR WIN RT";
+        return model;
+    }
+
     private static String clean(String value) { return value == null ? "" : value.trim(); }
     private static String first(ExifInterface exif, String... tags) {
         for (String tag : tags) { String value = clean(exif.getAttribute(tag)); if (!value.isEmpty()) return value; }
