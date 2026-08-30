@@ -283,14 +283,15 @@ public final class MainActivity extends Activity {
     }
 
     private void process(Uri uri) {
-        sourceUri = uri; progress.setVisibility(View.VISIBLE); finishedBytes = null; emptyState.setVisibility(View.GONE);
+        Uri originalUri = resolveWritableSource(uri);
+        sourceUri = originalUri; progress.setVisibility(View.VISIBLE); finishedBytes = null; emptyState.setVisibility(View.GONE);
         worker.execute(() -> {
             try {
-                byte[] all = readAll(uri); MotionPhotoSupport.Parts parts = MotionPhotoSupport.split(all);
-                PhotoMetadata metadata = PhotoMetadata.read(new ByteArrayInputStream(parts.imageBytes), queryDateTaken(uri));
+                byte[] all = readAll(originalUri); MotionPhotoSupport.Parts parts = MotionPhotoSupport.split(all);
+                PhotoMetadata metadata = PhotoMetadata.read(new ByteArrayInputStream(parts.imageBytes), queryDateTaken(originalUri));
                 // readAll 已优先取原始文件，只有位置仍然缺失时才再读一次兜底
                 if (metadata.location.isEmpty() && hasMediaLocationPermission()) {
-                    metadata = metadata.withFallback(readOriginalMetadata(uri, all));
+                    metadata = metadata.withFallback(readOriginalMetadata(originalUri, all));
                 }
                 if (!metadata.complete()) throw new MissingMetadataException("无法读取完整的照片信息，缺少：" + metadata.missingFields() + "。\n这张图片不能制作水印。");
                 ExifInterface originalExif = new ExifInterface(new ByteArrayInputStream(parts.imageBytes));
@@ -607,6 +608,10 @@ public final class MainActivity extends Activity {
     private Uri resolveWritableSource(Uri uri) {
         if (uri == null) return null;
         try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                Uri mediaUri = MediaStore.getMediaUri(this, uri);
+                if (mediaUri != null) return mediaUri;
+            }
             if ("com.android.providers.media.documents".equals(uri.getAuthority())) {
                 String documentId = android.provider.DocumentsContract.getDocumentId(uri);
                 String[] parts = documentId.split(":");
