@@ -10,8 +10,8 @@ import java.util.Locale;
 final class PhotoMetadata {
     final String device, date, exposure, location, brand;
 
-    private PhotoMetadata(String device, String date, String exposure, String location) {
-        this.device = device; this.date = date; this.exposure = exposure; this.location = location;
+    private PhotoMetadata(String device, String date, String exposure, String location, String brand) {
+        this.device = device; this.date = date; this.exposure = exposure; this.location = location; this.brand = brand;
     }
 
     static PhotoMetadata read(InputStream stream, String fallbackDate) throws IOException {
