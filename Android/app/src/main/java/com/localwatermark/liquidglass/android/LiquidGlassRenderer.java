@@ -85,22 +85,33 @@ final class LiquidGlassRenderer {
     }
 
     private static void drawLiquidMesh(Canvas canvas, Bitmap band, RectF rect, float h) {
-        int cols = 56, rows = 10; float[] vertices = new float[(cols + 1) * (rows + 1) * 2];
+        // Fixed optical lens derived from capsule geometry. The source pixels
+        // always come from the photograph under the capsule; there is no
+        // procedural wave or animation.
+        int cols = 72, rows = 18;
+        float[] vertices = new float[(cols + 1) * (rows + 1) * 2];
         int k = 0;
         for (int y = 0; y <= rows; y++) {
             float v = y / (float) rows;
             for (int x = 0; x <= cols; x++) {
                 float u = x / (float) cols;
-                float envelope = (float)Math.sin(Math.PI * v);
-                float endLens = (float)(Math.exp(-Math.pow(u / .115, 2)) - Math.exp(-Math.pow((u - 1) / .115, 2)));
-                float dx = (float)((Math.sin(u * Math.PI * 8 + v * 2.2) * .095 + endLens * .30) * h * envelope);
-                float dy = (float)((Math.sin(u * Math.PI * 3.2) * .22 + Math.cos(u * Math.PI * 6.0 + v) * .10) * h * .38 * envelope);
+                float ny = v * 2f - 1f;
+                float endDistance = Math.min(u, 1f-u) * rect.width() / h;
+                float endInfluence = clamp01(1f-endDistance/.50f);
+                float nx = u < .5f ? -1f : 1f;
+                float edgePower = (float) Math.pow(Math.abs(ny), 1.55);
+                float dx = nx * endInfluence * Math.max(0f, 1f-ny*ny) * h * .115f;
+                float dy = ny * (1f-.28f*endInfluence) * edgePower * h * .072f;
                 vertices[k++] = rect.left + u * rect.width() + dx;
                 vertices[k++] = rect.top + v * rect.height() + dy;
             }
         }
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
         canvas.drawBitmapMesh(band, cols, rows, vertices, 0, null, 0, paint);
+    }
+
+    private static float clamp01(float value) {
+        return Math.max(0f, Math.min(1f, value));
     }
 
     private static void drawTextAndLogo(Context context, Canvas canvas, RectF r, float h, PhotoMetadata m) throws Exception {
