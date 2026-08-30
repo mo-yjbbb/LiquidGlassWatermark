@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Locale;
 
 final class PhotoMetadata {
-    final String device, date, exposure, location;
+    final String device, date, exposure, location, brand;
 
     private PhotoMetadata(String device, String date, String exposure, String location) {
         this.device = device; this.date = date; this.exposure = exposure; this.location = location;
@@ -44,17 +44,21 @@ final class PhotoMetadata {
 
         float[] latLong = new float[2];
         String location = exif.getLatLong(latLong) ? coordinate(latLong[0], "N", "S") + "  " + coordinate(latLong[1], "E", "W") : "";
-        return new PhotoMetadata(device, date, String.join("  ", parts), location);
+        String identity = (make + " " + model).toLowerCase(Locale.ROOT);
+        String brand = (identity.contains("honor") || identity.contains("荣耀") || identity.contains("aak-an00"))
+                ? "honor" : "leica";
+        return new PhotoMetadata(device, date, String.join("  ", parts), location, brand);
     }
 
-    static PhotoMetadata empty() { return new PhotoMetadata("", "", "", ""); }
+    static PhotoMetadata empty() { return new PhotoMetadata("", "", "", "", ""); }
 
     PhotoMetadata withFallback(PhotoMetadata other) {
         return new PhotoMetadata(
                 device.isEmpty() ? other.device : device,
                 date.isEmpty() ? other.date : date,
                 exposure.isEmpty() ? other.exposure : exposure,
-                location.isEmpty() ? other.location : location);
+                location.isEmpty() ? other.location : location,
+                brand.isEmpty() ? other.brand : brand);
     }
 
     boolean usable() { return !device.isEmpty() || !date.isEmpty() || !exposure.isEmpty(); }
@@ -68,10 +72,7 @@ final class PhotoMetadata {
         if (location.isEmpty()) missing.add("经纬度");
         return String.join("、", missing);
     }
-    boolean isHonor() {
-        String value = device.toLowerCase(Locale.ROOT);
-        return value.contains("honor") || value.contains("荣耀") || value.contains("aak-an00");
-    }
+    boolean isHonor() { return "honor".equals(brand); }
 
     private static String displayDevice(String make, String model) {
         String joined = (make + " " + model).toLowerCase(Locale.ROOT);
