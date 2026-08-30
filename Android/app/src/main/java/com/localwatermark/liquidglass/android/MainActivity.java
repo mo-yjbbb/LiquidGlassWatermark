@@ -222,6 +222,9 @@ public final class MainActivity extends Activity {
         Intent intent = new Intent(Intent.ACTION_PICK,
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI).setType("image/*");
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            intent.putExtra(MediaStore.EXTRA_ACCEPT_ORIGINAL_MEDIA_FORMAT, true);
+        }
         try {
             startActivityForResult(intent, PICK_IMAGE);
         } catch (android.content.ActivityNotFoundException pickerMissing) {
@@ -325,7 +328,7 @@ public final class MainActivity extends Activity {
                 if (parts.motion) {
                     byte[] stillWithMeta = ExifBuilder.buildMotionJpeg(still, parts.imageBytes, exifFields,
                             renderedVideo.length, Math.max(presentationTs, 0), originalXmp);
-                    result = MotionPhotoSupport.join(stillWithMeta, renderedVideo);
+                    result = MotionPhotoSupport.join(stillWithMeta, parts.bridgeBytes, renderedVideo);
                 } else {
                     result = ExifBuilder.buildStillJpeg(still, parts.imageBytes, exifFields);
                 }
@@ -542,6 +545,10 @@ public final class MainActivity extends Activity {
                         "LGW_" + System.currentTimeMillis() + (sourceWasMotion ? "_MP.jpg" : ".jpg"));
                 values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg"); values.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/LiquidGlassWatermark");
                 values.put(MediaStore.Images.Media.IS_PENDING, 1);
+                if (sourceWasMotion && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    values.put(MediaStore.Files.FileColumns.SPECIAL_FORMAT,
+                            MediaStore.Files.FileColumns.SPECIAL_FORMAT_MOTION_PHOTO);
+                }
                 Uri output = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
                 if (output == null) throw new IOException("无法创建相册文件"); write(output, finishedBytes);
                 values.clear(); values.put(MediaStore.Images.Media.IS_PENDING, 0); getContentResolver().update(output, values, null, null);
@@ -578,9 +585,14 @@ public final class MainActivity extends Activity {
                 write(target, finishedBytes);
                 verifyAndNotify(target);
             } catch (Throwable error) {
+                String failureText = (String.valueOf(error.getMessage()) + " "
+                        + String.valueOf(error.getCause())).toLowerCase(java.util.Locale.ROOT);
                 boolean protectedMedia = error instanceof SecurityException
                         || error instanceof android.app.RecoverableSecurityException
-                        || error.getCause() instanceof SecurityException;
+                        || error instanceof java.io.FileNotFoundException
+                        || error.getCause() instanceof SecurityException
+                        || failureText.contains("permission") || failureText.contains("denied")
+                        || failureText.contains("eacces") || failureText.contains("operation not permitted");
                 if (protectedMedia && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
                         && isMediaStoreUri(target)) {
                     runOnUiThread(() -> requestOverwritePermission(target));
