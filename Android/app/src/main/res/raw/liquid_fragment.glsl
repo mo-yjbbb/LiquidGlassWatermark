@@ -71,8 +71,8 @@ void main() {
     // A thin boundary highlight, restricted to the horizontal top/bottom
     // and fading through the corners. It must never become an inner ring.
     float rimW = 1.0-smoothstep(0.0,0.018,depth);
-    float upper = smoothstep(0.58,0.96,-ny);
-    float lower = smoothstep(0.58,0.96, ny);
+    float upper = smoothstep(0.0,0.96,-ny);
+    float lower = smoothstep(0.0,0.96, ny);
     vec3 sampledLight = texture2D(uTexSampler,baseUv).rgb;
     vec3 highlight = mix(vec3(1.0),sampledLight*1.25+0.18,0.36);
     glass = 1.0-(1.0-glass)*(1.0-highlight*rimW*(upper*0.55+lower*0.46)*0.38);
