@@ -217,9 +217,8 @@ public final class MainActivity extends Activity {
     }
 
     private void openGallery() {
-        // 必须直接选择 MediaStore 原始条目。ACTION_GET_CONTENT / Photo Picker
-        // 在部分 Android / 荣耀系统会返回转换后的临时 URI：既不可覆盖，也会
-        // 剥离动态照片尾部的配对视频。
+        // 直接选择 MediaStore 原始条目。文档选择器/Photo Picker 在部分荣耀
+        // 系统会返回不可覆盖的临时 URI，并剥离动态照片尾部配对视频。
         Intent intent = new Intent(Intent.ACTION_PICK,
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI).setType("image/*");
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
@@ -227,8 +226,7 @@ public final class MainActivity extends Activity {
             startActivityForResult(intent, PICK_IMAGE);
         } catch (android.content.ActivityNotFoundException pickerMissing) {
             Intent fallback = new Intent(Intent.ACTION_OPEN_DOCUMENT)
-                    .setType("image/*")
-                    .addCategory(Intent.CATEGORY_OPENABLE)
+                    .setType("image/*").addCategory(Intent.CATEGORY_OPENABLE)
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
             startActivityForResult(fallback, PICK_IMAGE);
         }
@@ -581,7 +579,7 @@ public final class MainActivity extends Activity {
             } catch (Throwable error) {
                 boolean protectedMedia = error instanceof SecurityException
                         || error instanceof android.app.RecoverableSecurityException
-                        || (error.getCause() instanceof SecurityException);
+                        || error.getCause() instanceof SecurityException;
                 if (protectedMedia && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
                         && isMediaStoreUri(target)) {
                     runOnUiThread(() -> requestOverwritePermission(target));
@@ -600,7 +598,7 @@ public final class MainActivity extends Activity {
                         }
                     });
                 } else {
-                    notifyError(new IOException("无法覆盖原图；请重新从应用内的系统相册选择照片", error));
+                    notifyError(new IOException("无法覆盖原图；请重新从应用内系统相册选择照片", error));
                 }
             }
         });
