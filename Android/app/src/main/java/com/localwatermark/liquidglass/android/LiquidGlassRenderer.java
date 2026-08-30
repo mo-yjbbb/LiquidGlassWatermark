@@ -39,7 +39,7 @@ final class LiquidGlassRenderer {
         int highlight = Color.rgb((Color.red(sampled) + 2 * 255) / 3,
                 (Color.green(sampled) + 2 * 255) / 3, (Color.blue(sampled) + 2 * 255) / 3);
         Paint edge = new Paint(Paint.ANTI_ALIAS_FLAG); edge.setStyle(Paint.Style.STROKE);
-        edge.setStrokeWidth(Math.max(.92f * scale, .75f));
+        edge.setStrokeWidth(Math.max(1.50f * scale, 1.10f));
         edge.setShader(new LinearGradient(0, capsule.top, 0, capsule.bottom,
                 new int[]{withAlpha(highlight,.58f), withAlpha(highlight,.20f), withAlpha(highlight,.08f),
                         Color.TRANSPARENT, withAlpha(highlight,.08f), withAlpha(highlight,.18f), withAlpha(highlight,.52f)},
@@ -99,9 +99,9 @@ final class LiquidGlassRenderer {
                 float endDistance = Math.min(u, 1f-u) * rect.width() / h;
                 float endInfluence = clamp01(1f-endDistance/.50f);
                 float nx = u < .5f ? -1f : 1f;
-                float edgePower = (float) Math.pow(Math.abs(ny), 1.55);
-                float dx = nx * endInfluence * Math.max(0f, 1f-ny*ny) * h * .127f;
-                float dy = ny * (1f-.28f*endInfluence) * edgePower * h * .079f;
+                float lensProfile = .30f + .70f * (float)Math.pow(Math.abs(ny), 1.35);
+                float dx = nx * endInfluence * Math.max(0f, 1f-ny*ny) * h * .185f;
+                float dy = ny * (1f-.28f*endInfluence) * lensProfile * h * .115f;
                 vertices[k++] = rect.left + u * rect.width() + dx;
                 vertices[k++] = rect.top + v * rect.height() + dy;
             }
