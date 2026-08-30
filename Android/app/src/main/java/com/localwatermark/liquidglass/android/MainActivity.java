@@ -16,6 +16,7 @@ import java.util.concurrent.*;
 public final class MainActivity extends Activity {
     private static final int PICK_IMAGE = 42;
     private static final int MEDIA_LOCATION_PERMISSION = 43;
+    private static final int OVERWRITE_PERMISSION = 44;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private ImageView preview;
     private View emptyState;
@@ -25,6 +26,7 @@ public final class MainActivity extends Activity {
     private boolean sourceWasMotion;
     private boolean openPickerAfterPermission;
     private Uri pendingSharedUri;
+    private Uri pendingOverwriteUri;
 
     private static final class MissingMetadataException extends IOException {
         MissingMetadataException(String message) { super(message); }
@@ -268,6 +270,16 @@ public final class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
+        if (request == OVERWRITE_PERMISSION) {
+            Uri target = pendingOverwriteUri;
+            pendingOverwriteUri = null;
+            if (result == RESULT_OK && target != null) {
+                performOverwrite(target);
+            } else {
+                Toast.makeText(this, "已取消覆盖原图", Toast.LENGTH_SHORT).show();
+            }
+            return;
+        }
         if (request == PICK_IMAGE && result == RESULT_OK && data != null && data.getData() != null) {
             Uri uri = data.getData();
             try { getContentResolver().takePersistableUriPermission(uri, data.getFlags() &
@@ -544,16 +556,77 @@ public final class MainActivity extends Activity {
     }
 
     private void overwrite() {
+        if (finishedBytes == null || sourceUri == null) {
+            Toast.makeText(this, "没有可覆盖的处理结果", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Uri target = resolveWritableSource(sourceUri);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && isMediaStoreUri(target)) {
+            requestOverwritePermission(target);
+        } else {
+            performOverwrite(target);
+        }
+    }
+
+    private void requestOverwritePermission(Uri target) {
+        try {
+            pendingOverwriteUri = target;
+            android.app.PendingIntent permission = MediaStore.createWriteRequest(
+                    getContentResolver(), java.util.Collections.singletonList(target));
+            startIntentSenderForResult(permission.getIntentSender(), OVERWRITE_PERMISSION,
+                    null, 0, 0, 0);
+        } catch (Throwable error) {
+            pendingOverwriteUri = null;
+            notifyError(new IOException("无法申请原图修改权限", error));
+        }
+    }
+
+    private void performOverwrite(Uri target) {
         worker.execute(() -> {
-            try { write(sourceUri, finishedBytes); verifyAndNotify(sourceUri); }
-            catch (Throwable e) {
-                if (e instanceof SecurityException || e instanceof IllegalArgumentException) {
-                    runOnUiThread(() -> Toast.makeText(this,
-                            "该照片来自受限相册无法覆盖，已改为保存新照片", Toast.LENGTH_LONG).show());
-                    saveNew();
-                } else notifyError(e);
+            try {
+                write(target, finishedBytes);
+                verifyAndNotify(target);
+            } catch (Throwable error) {
+                if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q
+                        && error instanceof android.app.RecoverableSecurityException) {
+                    android.app.PendingIntent permission =
+                            ((android.app.RecoverableSecurityException)error).getUserAction().getActionIntent();
+                    pendingOverwriteUri = target;
+                    runOnUiThread(() -> {
+                        try {
+                            startIntentSenderForResult(permission.getIntentSender(), OVERWRITE_PERMISSION,
+                                    null, 0, 0, 0);
+                        } catch (IntentSender.SendIntentException launchError) {
+                            pendingOverwriteUri = null;
+                            notifyError(launchError);
+                        }
+                    });
+                } else {
+                    notifyError(new IOException("无法覆盖所选原图，请确认系统修改授权", error));
+                }
             }
         });
+    }
+
+    private Uri resolveWritableSource(Uri uri) {
+        if (uri == null) return null;
+        try {
+            if ("com.android.providers.media.documents".equals(uri.getAuthority())) {
+                String documentId = android.provider.DocumentsContract.getDocumentId(uri);
+                String[] parts = documentId.split(":");
+                if (parts.length == 2 && "image".equalsIgnoreCase(parts[0])) {
+                    long id = Long.parseLong(parts[1]);
+                    return ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id);
+                }
+            }
+        } catch (Throwable ignored) { }
+        return uri;
+    }
+
+    private static boolean isMediaStoreUri(Uri uri) {
+        if (uri == null || !"content".equalsIgnoreCase(uri.getScheme())) return false;
+        String authority = uri.getAuthority();
+        return authority != null && ("media".equals(authority) || authority.endsWith(".media"));
     }
 
     private void verifyAndNotify(Uri uri) throws IOException {
