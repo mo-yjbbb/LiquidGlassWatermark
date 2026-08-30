@@ -13,34 +13,30 @@ import java.io.IOException;
 
 @UnstableApi
 final class LiquidGlassVideoEffect implements GlEffect {
-    private final int outputWidth;
-    private final int outputHeight;
+    private final float targetAspect;
 
     /**
-     * @param outputWidth  输出分辨率，必须与静态图同宽高比。相册播放实况图时会把视频
-     *                     拉伸去贴合静态图的显示区域，比例不一致会导致水印胶囊变形、
-     *                     位置错位（表现为"胶囊内容消失""两头尖尖"）。
+     * @param targetAspect 静态图的宽高比。视频分辨率通常和静态图不同，相册播放时会把视频
+     *                     拉伸或 centerCrop 到静态图的显示区域；shader 据此算出一个"安全区"
+     *                     并把胶囊放进去，这样无论相册用哪种方式都不会变形。
      */
-    LiquidGlassVideoEffect(int outputWidth, int outputHeight) {
-        this.outputWidth = Math.max(2, outputWidth);
-        this.outputHeight = Math.max(2, outputHeight);
+    LiquidGlassVideoEffect(float targetAspect) {
+        this.targetAspect = targetAspect > 0f ? targetAspect : 1f;
     }
 
     @Override public BaseGlShaderProgram toGlShaderProgram(Context context, boolean useHdr)
             throws VideoFrameProcessingException {
-        return new Program(context, useHdr, outputWidth, outputHeight);
+        return new Program(context, useHdr, targetAspect);
     }
 
     private static final class Program extends BaseGlShaderProgram {
         private final GlProgram program;
-        private final int outputWidth;
-        private final int outputHeight;
+        private final float targetAspect;
 
-        Program(Context context, boolean useHdr, int outputWidth, int outputHeight)
+        Program(Context context, boolean useHdr, float targetAspect)
                 throws VideoFrameProcessingException {
             super(useHdr, 1);
-            this.outputWidth = outputWidth;
-            this.outputHeight = outputHeight;
+            this.targetAspect = targetAspect;
             try {
                 program = new GlProgram(context, R.raw.liquid_vertex, R.raw.liquid_fragment);
                 program.setBufferAttribute("aFramePosition", GlUtil.getNormalizedCoordinateBounds(),
@@ -54,15 +50,11 @@ final class LiquidGlassVideoEffect implements GlEffect {
         }
 
         @Override public Size configure(int inputWidth, int inputHeight) {
-            program.setFloatUniform("uAspect", outputWidth / (float) outputHeight);
-            // Transformer 会把任意比例的输入帧拉伸到 outputWidth x outputHeight。
-            // 反算出等比 centerCrop 的采样区域比例，交给 shader 还原，画面才不会变形。
-            int inW = Math.max(1, inputWidth);
-            int inH = Math.max(1, inputHeight);
-            float scale = Math.max(outputWidth / (float) inW, outputHeight / (float) inH);
-            program.setFloatUniform("uScaleX", outputWidth / (inW * scale));
-            program.setFloatUniform("uScaleY", outputHeight / (inH * scale));
-            return new Size(outputWidth, outputHeight);
+            program.setFloatUniform("uAspect", inputWidth / (float) Math.max(1, inputHeight));
+            program.setFloatUniform("uTargetAspect", targetAspect);
+            // 保持输入尺寸：不去赌 Transformer 会不会采用我们返回的输出分辨率。
+            // 形状正确性改由 shader 的安全区保证，与输出分辨率无关。
+            return new Size(inputWidth, inputHeight);
         }
 
         @Override public void drawFrame(int inputTexId, long presentationTimeUs)

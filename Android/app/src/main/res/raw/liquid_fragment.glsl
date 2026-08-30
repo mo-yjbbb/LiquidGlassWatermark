@@ -1,11 +1,8 @@
 precision highp float;
 uniform sampler2D uTexSampler;
-uniform float uAspect;
+uniform float uAspect;        // 输出画布的宽高比（= 输入视频的宽高比）
+uniform float uTargetAspect;  // 静态图的宽高比
 uniform float uTime;
-// 视频分辨率与静态图不同，Transformer 会把输入帧拉伸到目标画布；这两个值把采样坐标
-// 还原回等比 centerCrop，避免画面变形、胶囊被挤成尖角。未设置时退化为 (1,1)。
-uniform float uScaleX;
-uniform float uScaleY;
 varying vec2 vTexSamplingCoord;
 
 // 编写约束（踩过的坑，别改回去）：
@@ -14,6 +11,7 @@ varying vec2 vTexSamplingCoord;
 // 3) smoothstep(edge0, edge1, x) 必须 edge0 < edge1，反向写法结果未定义。
 // 4) SDF 参数里出现负数会让形状彻底崩坏，所有尺寸项都要夹住下限。
 // 5) 变量必须先声明再使用，分支里用到的要提前算好。
+// 6) uniform 未赋值时默认为 0，需要时要用 step/mix 兜底。
 
 float roundedBoxSdf(vec2 p, vec2 b, float r) {
     vec2 q = abs(p) - b + r;
@@ -24,29 +22,38 @@ void main() {
     vec2 uv = vTexSamplingCoord;
     float t = uTime;
     float aspect = max(uAspect, 0.0001);
-    float shortScale = min(1.0, uAspect);
+    // 静态图比例未设置时退化为画布比例，保证安全区 = 整个画布
+    float target = mix(aspect, max(uTargetAspect, 0.0001), step(0.01, uTargetAspect));
 
-    // 把输出画布坐标还原回源画面的等比 centerCrop 区域（胶囊内外都要用，必须先算）
-    vec2 scale = mix(vec2(1.0), vec2(uScaleX, uScaleY), step(0.01, min(uScaleX, uScaleY)));
-    vec2 src = (uv - 0.5) * scale + 0.5;
+    // ---- 安全区：输出画布内、按静态图比例居中的最大矩形 ----
+    // 视频分辨率往往和静态图不同，相册播放时会把视频拉伸或 centerCrop 到静态图的显示
+    // 区域。把胶囊画在这个安全区里，两种情况都不会变形：
+    //   拉伸     -> 安全区被拉满整屏，胶囊正好恢复成静态图上的比例
+    //   centerCrop -> 安全区就是可见区域，胶囊完整可见
+    float wide = step(target, aspect);
+    float safeW = mix(1.0, target / aspect, wide);
+    float safeH = mix(aspect / target, 1.0, wide);
 
-    // 与 LiquidGlassRenderer（静态图）完全同一套比例：短边 1.2% 边距、13.5% 高度、
-    // 圆角 = 半高（正半圆端头）。uv 两个轴的像素密度不同：横屏短边是高度、竖屏短边
-    // 是宽度，所以 x 方向要用 min(1, 1/aspect)，直接写 1/aspect 会让竖屏边距放大。
-    float marginY = 0.012 * shortScale;
-    float capsuleH = 0.135 * shortScale;
-    float marginX = 0.012 * min(1.0, 1.0 / aspect);
-    float left = marginX;
-    float right = 1.0 - marginX;
-    float bottom = marginY;
+    // 安全区的短边，换算成"画布高度为 1"的归一化单位
+    float shortUv = min(safeH, safeW * aspect);
+
+    // 与 LiquidGlassRenderer 同一套比例：短边 1.2% 边距、13.5% 高度、圆角 = 半高
+    float marginY = 0.012 * shortUv;
+    float capsuleH = 0.135 * shortUv;
+    float marginX = marginY / aspect;
+
+    float bottom = 0.5 - safeH * 0.5 + marginY;
     float top = bottom + capsuleH;
+    float left = 0.5 - safeW * 0.5 + marginX;
+    float right = 0.5 + safeW * 0.5 - marginX;
+
     vec2 center = vec2((left + right) * 0.5, (bottom + top) * 0.5);
     vec2 halfSize = vec2(max(right - left, 0.002) * 0.5, capsuleH * 0.5);
     float radius = capsuleH * 0.5;              // 正半圆端头
 
     float d = roundedBoxSdf(uv - center, halfSize, radius);
     if (d > 0.0) {
-        gl_FragColor = texture2D(uTexSampler, src);
+        gl_FragColor = texture2D(uTexSampler, uv);
         return;
     }
 
@@ -55,8 +62,8 @@ void main() {
     float v = local.y + 0.5;                    // 0..1 沿胶囊短轴
     float envelope = sin(3.14159265 * v);       // 上下缘为 0、中间最强
 
-    // ---- 折射扭曲：直接沿用 LiquidGlassRenderer.drawLiquidMesh 的公式，位移幅度
-    //      与静态图一致（约 0.4 倍胶囊高），只额外叠加时间相位让液面流动起来 ----
+    // ---- 折射扭曲：沿用 LiquidGlassRenderer.drawLiquidMesh 的公式，位移幅度与静态图
+    //      一致（约 0.4 倍胶囊高），只额外叠加时间相位让液面流动 ----
     float e0 = u / 0.115;
     float e1 = (u - 1.0) / 0.115;
     float endLens = exp(-e0 * e0) - exp(-e1 * e1);
@@ -65,11 +72,11 @@ void main() {
     float dy = (sin(u * 10.053 + t * 1.1) * 0.22 + cos(u * 18.850 + v + t * 1.7) * 0.10) * capsuleH * 0.38 * envelope * breathe;
     vec2 flow = vec2(dx / aspect, dy);
 
-    vec2 baseUv = clamp(src + flow, vec2(0.003), vec2(0.997));
+    vec2 baseUv = clamp(uv + flow, vec2(0.003), vec2(0.997));
 
-    // ---- 轻度磨砂：5 点固定采样（手写展开，循环内采样在部分驱动上会出问题）----
+    // ---- 轻度磨砂：5 点固定采样 ----
     float depth = clamp(-d / capsuleH, 0.0, 1.0);          // 0=边界 1=中心
-    float sp = (0.0016 + 0.0012 * (1.0 - depth)) * shortScale;
+    float sp = (0.0016 + 0.0012 * (1.0 - depth)) * shortUv;
     vec2 sx = vec2(sp / aspect, 0.0);
     vec2 sy = vec2(0.0, sp);
     vec3 c0 = texture2D(uTexSampler, baseUv).rgb;
@@ -81,16 +88,15 @@ void main() {
 
     // ---- 色散：边缘更明显 ----
     float rim = 1.0 - smoothstep(0.0, 0.18, depth);
-    float disp = (0.0014 + 0.0022 * rim) * shortScale / aspect;
+    float disp = (0.0014 + 0.0022 * rim) * shortUv / aspect;
     glass.r = mix(glass.r, texture2D(uTexSampler, clamp(baseUv + vec2(disp, 0.0), vec2(0.003), vec2(0.997))).r, 0.65);
     glass.b = mix(glass.b, texture2D(uTexSampler, clamp(baseUv - vec2(disp, 0.0), vec2(0.003), vec2(0.997))).b, 0.65);
 
-    // ---- 玻璃本体：极轻的提亮与冷调，保证底下内容始终看得清 ----
+    // ---- 玻璃本体：极轻的提亮与冷调 ----
     glass = mix(glass, vec3(1.0), 0.05);
     glass *= vec3(0.98, 0.99, 1.04);
 
-    // ---- 边缘描边：只在上缘和下缘发光（对应静态图的渐变描边），左右中段不发光，
-    //      这样不会出现"整圈发光"那种廉价感 ----
+    // ---- 边缘描边：只在上缘和下缘发光（对应静态图的渐变描边），左右中段不发光 ----
     float rimW = 1.0 - smoothstep(0.0, 0.055, depth);
     float upper = smoothstep(0.0, 0.32, -local.y);
     float lower = smoothstep(0.0, 0.32, local.y);

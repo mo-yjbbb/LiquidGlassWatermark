@@ -27,35 +27,23 @@ import java.util.concurrent.atomic.AtomicReference;
 final class MotionVideoRenderer {
     private MotionVideoRenderer() {}
 
-    /** 视频编码很吃分辨率，静态图动辄 4000px，等比缩到长边 1920 足够相册播放用。 */
-    private static final int MAX_LONG_SIDE = 1920;
-
-    /** 等比缩到长边不超过 maxLongSide，并取偶数（H264 编码器要求）。 */
-    private static int[] fitResolution(int width, int height, int maxLongSide) {
-        int w = Math.max(2, width), h = Math.max(2, height);
-        int longSide = Math.max(w, h);
-        if (longSide > maxLongSide) {
-            float k = maxLongSide / (float) longSide;
-            w = Math.round(w * k);
-            h = Math.round(h * k);
-        }
-        w -= w % 2;
-        h -= h % 2;
-        return new int[]{Math.max(2, w), Math.max(2, h)};
-    }
-
     static void render(Context context, File input, File output, int width, int height,
                        PhotoMetadata metadata) throws Exception {
-        int[] target = fitResolution(width, height, MAX_LONG_SIDE);
-        int outWidth = target[0], outHeight = target[1];
-        Bitmap content = LiquidGlassRenderer.createContentOverlay(context, outWidth, outHeight, metadata);
+        // 静态图宽高比：视频通常与之不同，靠它算出胶囊应该待的安全区
+        float targetAspect = width / (float) Math.max(1, height);
+        int[] videoSize = probeVideoSize(input);
+        int videoWidth = videoSize[0] > 0 ? videoSize[0] : width;
+        int videoHeight = videoSize[1] > 0 ? videoSize[1] : height;
+
+        Bitmap content = LiquidGlassRenderer.createContentOverlay(
+                context, videoWidth, videoHeight, targetAspect, metadata);
         CountDownLatch finished = new CountDownLatch(1);
         AtomicReference<Throwable> failure = new AtomicReference<>();
         new Handler(Looper.getMainLooper()).post(() -> {
             try {
                 BitmapOverlay bitmapOverlay = BitmapOverlay.createStaticBitmapOverlay(content);
                 List<Effect> videoEffects = new ArrayList<>();
-                videoEffects.add(new LiquidGlassVideoEffect(outWidth, outHeight));
+                videoEffects.add(new LiquidGlassVideoEffect(targetAspect));
                 videoEffects.add(new OverlayEffect(Collections.singletonList(bitmapOverlay)));
                 EditedMediaItem item = new EditedMediaItem.Builder(MediaItem.fromUri(input.toURI().toString()))
                         .setEffects(new Effects(Collections.emptyList(), videoEffects)).build();
@@ -78,5 +66,32 @@ final class MotionVideoRenderer {
         content.recycle();
         if (failure.get() != null) throw new Exception("动态视频渲染失败", failure.get());
         if (!output.isFile() || output.length() < 32) throw new Exception("动态视频输出为空");
+    }
+
+    /** 探测视频分辨率，用于按视频画布的比例绘制文字图层。失败返回 {0,0}。 */
+    private static int[] probeVideoSize(File file) {
+        int[] size = new int[]{0, 0};
+        android.media.MediaMetadataRetriever retriever = null;
+        try {
+            retriever = new android.media.MediaMetadataRetriever();
+            retriever.setDataSource(file.getAbsolutePath());
+            size[0] = parseInt(retriever.extractMetadata(
+                    android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH));
+            size[1] = parseInt(retriever.extractMetadata(
+                    android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT));
+        } catch (Throwable ignored) {
+            size[0] = 0;
+            size[1] = 0;
+        } finally {
+            if (retriever != null) {
+                try { retriever.release(); } catch (Throwable ignored) { }
+            }
+        }
+        return size;
+    }
+
+    private static int parseInt(String value) {
+        if (value == null) return 0;
+        try { return Integer.parseInt(value.trim()); } catch (NumberFormatException e) { return 0; }
     }
 }

@@ -53,14 +53,33 @@ final class LiquidGlassRenderer {
         return out;
     }
 
-    static Bitmap createContentOverlay(Context context, int width, int height, PhotoMetadata meta) throws Exception {
+    /**
+     * 生成贴在视频上的文字/Logo 图层。
+     *
+     * @param targetAspect 静态图宽高比。视频比例往往不同，这里要按同样的"安全区"规则布局，
+     *                     文字才能和 shader 画出的胶囊严格对齐。
+     */
+    static Bitmap createContentOverlay(Context context, int width, int height,
+                                       float targetAspect, PhotoMetadata meta) throws Exception {
         Bitmap overlay = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(overlay);
-        float shortSide = Math.min(width, height);
-        float scale = Math.max(shortSide / 1080f, .35f);
-        float margin = Math.max(shortSide * .012f, 8 * scale);
+
+        float aspect = width / (float) height;
+        float target = targetAspect > 0f ? targetAspect : aspect;
+        float safeW, safeH;
+        if (aspect >= target) { safeH = 1f; safeW = target / aspect; }
+        else { safeW = 1f; safeH = aspect / target; }
+
+        float left = (1f - safeW) * 0.5f * width;
+        float top = (1f - safeH) * 0.5f * height;
+        float safeWidth = safeW * width;
+        float safeHeight = safeH * height;
+
+        float shortSide = Math.max(1f, Math.min(safeWidth, safeHeight));
+        float margin = shortSide * .012f;
         float h = shortSide * .135f;
-        RectF capsule = new RectF(margin, height - margin - h, width - margin, height - margin);
+        RectF capsule = new RectF(left + margin, top + safeHeight - margin - h,
+                left + safeWidth - margin, top + safeHeight - margin);
         drawTextAndLogo(context, canvas, capsule, h, meta);
         return overlay;
     }
