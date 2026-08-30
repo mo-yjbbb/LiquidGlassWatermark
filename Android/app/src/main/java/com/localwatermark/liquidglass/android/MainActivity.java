@@ -105,7 +105,11 @@ public final class MainActivity extends Activity {
     private void openGallery() {
         Intent intent;
         if (Build.VERSION.SDK_INT >= 33) {
-            intent = new Intent(MediaStore.ACTION_PICK_IMAGES).setType("image/*");
+            // 刻意不用 ACTION_PICK_IMAGES：系统 Photo Picker 为了保护隐私会剥离
+            // EXIF 里的经纬度，且不支持 setRequireOriginal，本应用就拿不到相机
+            // 原始字节（位置、私有动态照片标签全丢）。走传统选择器保住这些数据。
+            intent = new Intent(Intent.ACTION_GET_CONTENT).setType("image/*")
+                    .addCategory(Intent.CATEGORY_OPENABLE);
         } else {
             intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI).setType("image/*");
         }
@@ -166,7 +170,10 @@ public final class MainActivity extends Activity {
             try {
                 byte[] all = readAll(uri); MotionPhotoSupport.Parts parts = MotionPhotoSupport.split(all);
                 PhotoMetadata metadata = PhotoMetadata.read(new ByteArrayInputStream(parts.imageBytes), queryDateTaken(uri));
-                if (hasMediaLocationPermission()) metadata = metadata.withFallback(readOriginalMetadata(uri, all));
+                // readAll 已优先取原始文件，只有位置仍然缺失时才再读一次兜底
+                if (metadata.location.isEmpty() && hasMediaLocationPermission()) {
+                    metadata = metadata.withFallback(readOriginalMetadata(uri, all));
+                }
                 if (!metadata.usable()) throw new IOException("照片内没有可用的拍摄参数（可能已被聊天软件压缩去除），无法生成水印");
                 ExifInterface originalExif = new ExifInterface(new ByteArrayInputStream(parts.imageBytes));
                 ExifBuilder.Fields exifFields = ExifFields.from(originalExif);
@@ -328,11 +335,14 @@ public final class MainActivity extends Activity {
     private void write(Uri uri, byte[] bytes) throws IOException { try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("没有写入权限");out.write(bytes);} }
     private byte[] readAll(Uri uri) throws IOException {
         java.util.List<Uri> candidates = new java.util.ArrayList<>(2);
-        candidates.add(uri);
+        // 关键：普通 URI 读到的图片会被系统剥离 GPS（Android 10+ 的位置隐私设计），
+        // 必须优先走 setRequireOriginal 才能拿到相机原始字节：既有经纬度，也是
+        // 原汁原味的 EXIF（ExifBuilder 继承的就是它）。失败再回退普通 URI。
         if (hasMediaLocationPermission()) {
-            try { Uri original = MediaStore.setRequireOriginal(uri); if (!candidates.contains(original)) candidates.add(original); }
+            try { candidates.add(MediaStore.setRequireOriginal(uri)); }
             catch (Throwable ignored) { }
         }
+        candidates.add(uri);
         IOException last = null;
         for (Uri candidate : candidates) {
             try {

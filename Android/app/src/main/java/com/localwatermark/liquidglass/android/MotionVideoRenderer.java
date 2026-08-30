@@ -27,16 +27,35 @@ import java.util.concurrent.atomic.AtomicReference;
 final class MotionVideoRenderer {
     private MotionVideoRenderer() {}
 
+    /** 视频编码很吃分辨率，静态图动辄 4000px，等比缩到长边 1920 足够相册播放用。 */
+    private static final int MAX_LONG_SIDE = 1920;
+
+    /** 等比缩到长边不超过 maxLongSide，并取偶数（H264 编码器要求）。 */
+    private static int[] fitResolution(int width, int height, int maxLongSide) {
+        int w = Math.max(2, width), h = Math.max(2, height);
+        int longSide = Math.max(w, h);
+        if (longSide > maxLongSide) {
+            float k = maxLongSide / (float) longSide;
+            w = Math.round(w * k);
+            h = Math.round(h * k);
+        }
+        w -= w % 2;
+        h -= h % 2;
+        return new int[]{Math.max(2, w), Math.max(2, h)};
+    }
+
     static void render(Context context, File input, File output, int width, int height,
                        PhotoMetadata metadata) throws Exception {
-        Bitmap content = LiquidGlassRenderer.createContentOverlay(context, width, height, metadata);
+        int[] target = fitResolution(width, height, MAX_LONG_SIDE);
+        int outWidth = target[0], outHeight = target[1];
+        Bitmap content = LiquidGlassRenderer.createContentOverlay(context, outWidth, outHeight, metadata);
         CountDownLatch finished = new CountDownLatch(1);
         AtomicReference<Throwable> failure = new AtomicReference<>();
         new Handler(Looper.getMainLooper()).post(() -> {
             try {
                 BitmapOverlay bitmapOverlay = BitmapOverlay.createStaticBitmapOverlay(content);
                 List<Effect> videoEffects = new ArrayList<>();
-                videoEffects.add(new LiquidGlassVideoEffect());
+                videoEffects.add(new LiquidGlassVideoEffect(outWidth, outHeight));
                 videoEffects.add(new OverlayEffect(Collections.singletonList(bitmapOverlay)));
                 EditedMediaItem item = new EditedMediaItem.Builder(MediaItem.fromUri(input.toURI().toString()))
                         .setEffects(new Effects(Collections.emptyList(), videoEffects)).build();
