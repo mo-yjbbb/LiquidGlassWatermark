@@ -8,8 +8,8 @@ android {
         applicationId "com.localwatermark.liquidglass.android"
         minSdk 29
         targetSdk 37
-        versionCode 12
-        versionName "2.1-ui-redesign"
+        versionCode 13
+        versionName "2.1.1-copyright"
     }
     buildTypes {
         release {
