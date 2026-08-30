@@ -10,6 +10,7 @@ import androidx.media3.common.MimeTypes;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.effect.BitmapOverlay;
 import androidx.media3.effect.OverlayEffect;
+import androidx.media3.effect.Presentation;
 import androidx.media3.transformer.EditedMediaItem;
 import androidx.media3.transformer.Effects;
 import androidx.media3.transformer.ExportException;
@@ -27,22 +28,36 @@ import java.util.concurrent.atomic.AtomicReference;
 final class MotionVideoRenderer {
     private MotionVideoRenderer() {}
 
+    private static final int MAX_LONG_SIDE = 1920;
+
+    private static int[] targetResolution(int width, int height) {
+        int w = Math.max(2, width), h = Math.max(2, height);
+        float scale = Math.min(1f, MAX_LONG_SIDE / (float)Math.max(w, h));
+        w = Math.max(2, Math.round(w * scale));
+        h = Math.max(2, Math.round(h * scale));
+        w -= w & 1;
+        h -= h & 1;
+        return new int[]{Math.max(2,w), Math.max(2,h)};
+    }
+
     static void render(Context context, File input, File output, int width, int height,
                        PhotoMetadata metadata) throws Exception {
-        // 静态图宽高比：视频通常与之不同，靠它算出胶囊应该待的安全区
-        float targetAspect = width / (float) Math.max(1, height);
-        int[] videoSize = probeVideoSize(input);
-        int videoWidth = videoSize[0] > 0 ? videoSize[0] : width;
-        int videoHeight = videoSize[1] > 0 ? videoSize[1] : height;
-
+        // Force the motion video to the same aspect ratio as its cover image.
+        // Presentation performs a real center-crop before both the shader and
+        // overlay, so the capsule uses exactly the cover geometry while playing.
+        int[] target = targetResolution(width, height);
+        int outWidth = target[0], outHeight = target[1];
+        float targetAspect = outWidth / (float)outHeight;
         Bitmap content = LiquidGlassRenderer.createContentOverlay(
-                context, videoWidth, videoHeight, targetAspect, metadata);
+                context, outWidth, outHeight, targetAspect, metadata);
         CountDownLatch finished = new CountDownLatch(1);
         AtomicReference<Throwable> failure = new AtomicReference<>();
         new Handler(Looper.getMainLooper()).post(() -> {
             try {
                 BitmapOverlay bitmapOverlay = BitmapOverlay.createStaticBitmapOverlay(content);
                 List<Effect> videoEffects = new ArrayList<>();
+                videoEffects.add(Presentation.createForWidthAndHeight(
+                        outWidth, outHeight, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP));
                 videoEffects.add(new LiquidGlassVideoEffect(targetAspect));
                 videoEffects.add(new OverlayEffect(Collections.singletonList(bitmapOverlay)));
                 EditedMediaItem item = new EditedMediaItem.Builder(MediaItem.fromUri(input.toURI().toString()))
