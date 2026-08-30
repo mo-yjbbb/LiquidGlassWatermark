@@ -8,8 +8,8 @@ android {
         applicationId "com.localwatermark.liquidglass.android"
         minSdk 29
         targetSdk 37
-        versionCode 11
-        versionName "2.0-lens-sync"
+        versionCode 12
+        versionName "2.1-ui-redesign"
     }
     buildTypes {
         release {
