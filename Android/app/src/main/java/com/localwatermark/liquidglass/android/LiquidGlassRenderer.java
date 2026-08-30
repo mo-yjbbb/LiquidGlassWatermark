@@ -139,7 +139,10 @@ final class LiquidGlassRenderer {
 
         float logoSize = h * .56f; RectF logoRect = new RectF(sepX - h * .16f - logoSize, r.centerY() - logoSize/2,
                 sepX - h * .16f, r.centerY() + logoSize/2);
-        SVG logo = SVG.getFromResource(context, com.localwatermark.liquidglass.android.R.raw.leica);
+        int logoResource = m.isHonor()
+                ? com.localwatermark.liquidglass.android.R.raw.honor
+                : com.localwatermark.liquidglass.android.R.raw.leica;
+        SVG logo = SVG.getFromResource(context, logoResource);
         canvas.save(); canvas.clipRect(logoRect); canvas.translate(logoRect.left, logoRect.top);
         float sx = logoRect.width() / logo.getDocumentWidth(), sy = logoRect.height() / logo.getDocumentHeight();
         float s = Math.min(sx, sy); canvas.translate((logoRect.width() - logo.getDocumentWidth()*s)/2,
