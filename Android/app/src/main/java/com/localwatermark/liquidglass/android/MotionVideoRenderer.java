@@ -28,26 +28,14 @@ import java.util.concurrent.atomic.AtomicReference;
 final class MotionVideoRenderer {
     private MotionVideoRenderer() {}
 
-    private static final int MAX_LONG_SIDE = 1920;
-
-    private static int[] targetResolution(int width, int height) {
-        int w = Math.max(2, width), h = Math.max(2, height);
-        float scale = Math.min(1f, MAX_LONG_SIDE / (float)Math.max(w, h));
-        w = Math.max(2, Math.round(w * scale));
-        h = Math.max(2, Math.round(h * scale));
-        w -= w & 1;
-        h -= h & 1;
-        return new int[]{Math.max(2,w), Math.max(2,h)};
-    }
-
     static void render(Context context, File input, File output, int width, int height,
                        PhotoMetadata metadata) throws Exception {
-        // Force the motion video to the same aspect ratio as its cover image.
-        // Presentation performs a real center-crop before both the shader and
-        // overlay, so the capsule uses exactly the cover geometry while playing.
-        int[] target = targetResolution(width, height);
-        int outWidth = target[0], outHeight = target[1];
-        float targetAspect = outWidth / (float)outHeight;
+        // 保留原视频轨道方向，不再用封面宽高强制重建视频画布。
+        // Media3 会把轨道旋转矩阵应用到效果输入；水印只引用封面比例定位。
+        int[] video = probeVideoSize(input);
+        int outWidth = video[0] > 0 ? video[0] : width;
+        int outHeight = video[1] > 0 ? video[1] : height;
+        float targetAspect = width / (float)Math.max(1, height);
         Bitmap content = LiquidGlassRenderer.createContentOverlay(
                 context, outWidth, outHeight, targetAspect, metadata);
         CountDownLatch finished = new CountDownLatch(1);
@@ -56,8 +44,6 @@ final class MotionVideoRenderer {
             try {
                 BitmapOverlay bitmapOverlay = BitmapOverlay.createStaticBitmapOverlay(content);
                 List<Effect> videoEffects = new ArrayList<>();
-                videoEffects.add(Presentation.createForWidthAndHeight(
-                        outWidth, outHeight, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP));
                 videoEffects.add(new LiquidGlassVideoEffect(targetAspect));
                 videoEffects.add(new OverlayEffect(Collections.singletonList(bitmapOverlay)));
                 EditedMediaItem item = new EditedMediaItem.Builder(MediaItem.fromUri(input.toURI().toString()))
