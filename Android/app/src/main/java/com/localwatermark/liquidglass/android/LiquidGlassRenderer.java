@@ -14,7 +14,7 @@ final class LiquidGlassRenderer {
         float margin = Math.max(shortSide * .012f, 8 * scale);
         float h = shortSide * .135f;
         RectF capsule = new RectF(margin, out.getHeight() - margin - h, out.getWidth() - margin, out.getHeight() - margin);
-        float radius = h * .47f;
+        float radius = h * .5f;         // 正半圆端头（胶囊形），与视频 shader 保持一致
 
         int left = Math.max(0, Math.round(capsule.left));
         int top = Math.max(0, Math.round(capsule.top));
