@@ -25,9 +25,17 @@ void main() {
     float aspect = max(uAspect, 0.0001);
     float shortScale = min(1.0, uAspect);
 
-    float marginY = 0.018 * shortScale;
-    float capsuleH = 0.145 * shortScale;
-    float marginX = 0.018 / aspect;
+    // 把输出画布坐标还原回源画面的等比 centerCrop 区域（胶囊内外都要用，必须先算）
+    vec2 scale = mix(vec2(1.0), vec2(uScaleX, uScaleY), step(0.01, min(uScaleX, uScaleY)));
+    vec2 src = (uv - 0.5) * scale + 0.5;
+
+    // 与 LiquidGlassRenderer（静态图）完全同一套比例：短边 1.2% 边距、13.5% 高度、
+    // 圆角为高度的 0.47 倍 —— 这样长按播放时胶囊位置和大小都不会跳变。
+    // 注意 uv 两个轴的像素密度不同：横屏短边是高度、竖屏短边是宽度，
+    // 所以 x 方向要用 min(1, 1/aspect)，直接写 1/aspect 会让竖屏边距被放大。
+    float marginY = 0.012 * shortScale;
+    float capsuleH = 0.135 * shortScale;
+    float marginX = 0.012 * min(1.0, 1.0 / aspect);
     float left = marginX;
     float right = 1.0 - marginX;
     float bottom = marginY;
@@ -35,7 +43,7 @@ void main() {
 
     vec2 center = vec2((left + right) * 0.5, (bottom + top) * 0.5);
     vec2 halfSize = vec2(max(right - left, 0.002) * 0.5, capsuleH * 0.5);
-    float radius = capsuleH * 0.5;          // 正好半高 → 标准胶囊，两端是正半圆
+    float radius = capsuleH * 0.47;
 
     float d = roundedBoxSdf(uv - center, halfSize, radius);
     if (d > 0.0) {
@@ -46,10 +54,6 @@ void main() {
     vec2 local = (uv - center) / vec2(max(right - left, 0.002), capsuleH);
     float depth = clamp(-d / capsuleH, 0.0, 1.0);           // 0=边界 1=中心
     float rim = 1.0 - smoothstep(0.0, 0.16, depth);         // 只在很靠边的一圈
-
-    // 把输出画布坐标还原回源画面的等比 centerCrop 区域
-    vec2 scale = mix(vec2(1.0), vec2(uScaleX, uScaleY), step(0.01, min(uScaleX, uScaleY)));
-    vec2 src = (uv - 0.5) * scale + 0.5;
 
     // ---- 液态流动：三层正弦，相位随时间漂移 ----
     float breathe = 0.85 + 0.15 * sin(t * 0.8);
