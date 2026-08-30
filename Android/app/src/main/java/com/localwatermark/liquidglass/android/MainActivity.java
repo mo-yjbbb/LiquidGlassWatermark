@@ -55,36 +55,28 @@ public final class MainActivity extends Activity {
         });
 
         LinearLayout header = new LinearLayout(this);
-        header.setOrientation(LinearLayout.HORIZONTAL);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(0,0,0,dp(18));
-
-        ImageView brandIcon = new ImageView(this);
-        brandIcon.setImageResource(R.drawable.app_icon);
-        brandIcon.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        brandIcon.setClipToOutline(true);
-        header.addView(brandIcon,new LinearLayout.LayoutParams(dp(52),dp(52)));
-
-        LinearLayout heading = new LinearLayout(this);
-        heading.setOrientation(LinearLayout.VERTICAL);
-        heading.setPadding(dp(13),0,0,0);
-        TextView title = label("液态玻璃",26,Color.WHITE,Typeface.BOLD);
-        TextView subtitle = label("影像水印工坊",13,0xa8ffffff,Typeface.NORMAL);
-        subtitle.setLetterSpacing(.08f);
-        subtitle.setPadding(0,dp(2),0,0);
-        heading.addView(title); heading.addView(subtitle);
-        header.addView(heading,new LinearLayout.LayoutParams(0,-2,1f));
-
-        TextView localChip = label("●  本地处理",12,0xddffffff,Typeface.BOLD);
-        localChip.setGravity(Gravity.CENTER);
-        localChip.setBackground(new LiquidUiDrawable(LiquidUiDrawable.CHIP));
-        localChip.setPadding(dp(13),0,dp(13),0);
-        header.addView(localChip,new LinearLayout.LayoutParams(-2,dp(36)));
+        header.setOrientation(LinearLayout.VERTICAL);
+        header.setGravity(Gravity.CENTER);
+        header.setPadding(0,dp(2),0,dp(18));
+        TextView title = label("小米液态玻璃水印",26,Color.WHITE,Typeface.BOLD);
+        title.setGravity(Gravity.CENTER);
+        TextView subtitle = label("目前只有徕卡 Logo 水印",13,0xa8ffffff,Typeface.NORMAL);
+        subtitle.setGravity(Gravity.CENTER);
+        subtitle.setLetterSpacing(.05f);
+        subtitle.setPadding(0,dp(4),0,0);
+        header.addView(title,new LinearLayout.LayoutParams(-1,-2));
+        header.addView(subtitle,new LinearLayout.LayoutParams(-1,-2));
 
         FrameLayout previewCard = new FrameLayout(this);
         previewCard.setBackground(new LiquidUiDrawable(LiquidUiDrawable.PANEL));
         previewCard.setPadding(dp(7),dp(7),dp(7),dp(7));
         previewCard.setElevation(dp(10));
+        previewCard.setOutlineProvider(new ViewOutlineProvider() {
+            @Override public void getOutline(View view, Outline outline) {
+                outline.setRoundRect(0,0,view.getWidth(),view.getHeight(),dp(28));
+            }
+        });
+        previewCard.setClipToOutline(true);
 
         preview = new ImageView(this);
         preview.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -152,9 +144,15 @@ public final class MainActivity extends Activity {
         select.setElevation(dp(9));
         select.setOnClickListener(vw->pick());
 
-        TextView footer=label("所有处理均在设备本地完成  ·  © 2026 by 呀哈哈我被发现了再见",12,0x78ffffff,Typeface.NORMAL);
-        footer.setGravity(Gravity.CENTER);
+        LinearLayout footer=new LinearLayout(this);
+        footer.setOrientation(LinearLayout.HORIZONTAL);
+        footer.setGravity(Gravity.CENTER_VERTICAL);
         footer.setPadding(0,dp(11),0,0);
+        TextView localFooter=label("操作仅本地处理",12,0x78ffffff,Typeface.NORMAL);
+        TextView authorFooter=label("小米社区-呀哈哈我被发现了再见",12,0x78ffffff,Typeface.NORMAL);
+        authorFooter.setGravity(Gravity.RIGHT);
+        footer.addView(localFooter,new LinearLayout.LayoutParams(0,-2,1f));
+        footer.addView(authorFooter,new LinearLayout.LayoutParams(0,-2,1f));
 
         root.addView(header,new LinearLayout.LayoutParams(-1,-2));
         LinearLayout.LayoutParams cardParams=new LinearLayout.LayoutParams(-1,0,1f);
