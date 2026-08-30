@@ -66,7 +66,7 @@ void main() {
     float dispersion = (0.0014+0.0022*rim)*shortUv/aspect;
     glass.r = mix(glass.r,texture2D(uTexSampler,clamp(baseUv+vec2(dispersion,0.0),vec2(0.003),vec2(0.997))).r,0.65);
     glass.b = mix(glass.b,texture2D(uTexSampler,clamp(baseUv-vec2(dispersion,0.0),vec2(0.003),vec2(0.997))).b,0.65);
-    glass = mix(glass,vec3(1.0),0.03);
+    glass = mix(glass,vec3(1.0),0.02);
 
     float rimW = 1.0-smoothstep(0.0,0.055,depth);
     float upper = smoothstep(0.0,0.32,-ny*0.5);
