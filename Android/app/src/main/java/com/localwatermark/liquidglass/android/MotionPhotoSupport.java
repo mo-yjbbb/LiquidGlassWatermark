@@ -15,13 +15,13 @@ final class MotionPhotoSupport {
 
     static Parts split(byte[] file) {
         int ftyp = indexOf(file, "ftyp".getBytes(StandardCharsets.US_ASCII), 4);
-        if (ftyp < 4) return new Parts(file, new byte[0], false);
+        if (ftyp < 4) return new Parts(file, new byte[0], new byte[0], false);
         int start = ftyp - 4;
         long boxSize = ((long)(file[start] & 255) << 24) | ((long)(file[start + 1] & 255) << 16)
                 | ((long)(file[start + 2] & 255) << 8) | (file[start + 3] & 255);
-        if (boxSize < 8 || start + boxSize > file.length) return new Parts(file, new byte[0], false);
+        if (boxSize < 8 || start + boxSize > file.length) return new Parts(file, new byte[0], new byte[0], false);
         int eoi = lastJpegEoiBefore(file, start);
-        if (eoi < 0) return new Parts(file, new byte[0], false);
+        if (eoi < 0) return new Parts(file, new byte[0], new byte[0], false);
         return new Parts(Arrays.copyOfRange(file, 0, eoi + 2),
                 Arrays.copyOfRange(file, start, file.length), true);
     }
