@@ -46,9 +46,9 @@ void main() {
     float endDistance = min((uv.x-left)*aspect, (right-uv.x)*aspect) / max(capsuleH,0.0001);
     float endInfluence = clamp(1.0-endDistance/0.50, 0.0, 1.0);
     float nx = uv.x < center.x ? -1.0 : 1.0;
-    float edgePower = pow(abs(ny), 1.55);
-    vec2 flow = vec2(nx*endInfluence*max(0.0,1.0-ny*ny)*capsuleH*0.127/aspect,
-                     ny*(1.0-0.28*endInfluence)*edgePower*capsuleH*0.079);
+    float lensProfile = 0.30+0.70*pow(abs(ny),1.35);
+    vec2 flow = vec2(nx*endInfluence*max(0.0,1.0-ny*ny)*capsuleH*0.185/aspect,
+                     ny*(1.0-0.28*endInfluence)*lensProfile*capsuleH*0.115);
     vec2 baseUv = clamp(uv-flow, vec2(0.003), vec2(0.997));
 
     float depth = clamp(-d / max(capsuleH,0.0001), 0.0, 1.0);
@@ -68,9 +68,11 @@ void main() {
     glass.b = mix(glass.b,texture2D(uTexSampler,clamp(baseUv-vec2(dispersion,0.0),vec2(0.003),vec2(0.997))).b,0.65);
     glass = mix(glass,vec3(1.0),0.02);
 
-    float rimW = 1.0-smoothstep(0.0,0.055,depth);
-    float upper = smoothstep(0.0,0.32,-ny*0.5);
-    float lower = smoothstep(0.0,0.32, ny*0.5);
+    // A thin boundary highlight, restricted to the horizontal top/bottom
+    // and fading through the corners. It must never become an inner ring.
+    float rimW = 1.0-smoothstep(0.0,0.018,depth);
+    float upper = smoothstep(0.58,0.96,-ny);
+    float lower = smoothstep(0.58,0.96, ny);
     vec3 sampledLight = texture2D(uTexSampler,baseUv).rgb;
     vec3 highlight = mix(vec3(1.0),sampledLight*1.25+0.18,0.36);
     glass = 1.0-(1.0-glass)*(1.0-highlight*rimW*(upper*0.55+lower*0.46)*0.38);
