@@ -58,8 +58,6 @@ public final class MainActivity extends Activity {
         ImageView brandIcon = new ImageView(this);
         brandIcon.setImageResource(R.drawable.app_icon);
         brandIcon.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        brandIcon.setBackground(new LiquidUiDrawable(LiquidUiDrawable.CHIP));
-        brandIcon.setPadding(dp(3),dp(3),dp(3),dp(3));
         brandIcon.setClipToOutline(true);
         header.addView(brandIcon,new LinearLayout.LayoutParams(dp(52),dp(52)));
 
