@@ -62,7 +62,7 @@ public final class MainActivity extends Activity {
         header.setPadding(0,dp(2),0,dp(18));
         TextView title = label("小米液态玻璃水印",26,Color.WHITE,Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
-        TextView subtitle = label("目前只有徕卡 Logo 水印",13,0xa8ffffff,Typeface.NORMAL);
+        TextView subtitle = label("目前只有徕卡 / 荣耀水印",13,0xa8ffffff,Typeface.NORMAL);
         subtitle.setGravity(Gravity.CENTER);
         subtitle.setLetterSpacing(.05f);
         subtitle.setPadding(0,dp(4),0,0);
