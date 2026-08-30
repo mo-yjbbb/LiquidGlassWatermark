@@ -2,8 +2,6 @@ package com.localwatermark.liquidglass.android;
 
 import android.graphics.*;
 import android.graphics.drawable.Drawable;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 /** Lightweight GPU-friendly liquid/frosted glass surface for the app chrome. */
 final class LiquidUiDrawable extends Drawable {
@@ -19,7 +17,7 @@ final class LiquidUiDrawable extends Drawable {
 
     LiquidUiDrawable(int style) { this.style = style; }
 
-    @Override public void draw(@NonNull Canvas canvas) {
+    @Override public void draw(Canvas canvas) {
         Rect b = getBounds();
         if (b.isEmpty()) return;
         float w=b.width(), h=b.height();
@@ -88,6 +86,6 @@ final class LiquidUiDrawable extends Drawable {
     }
 
     @Override public void setAlpha(int value){alpha=value;invalidateSelf();}
-    @Override public void setColorFilter(@Nullable ColorFilter filter){paint.setColorFilter(filter);invalidateSelf();}
+    @Override public void setColorFilter(ColorFilter filter){paint.setColorFilter(filter);invalidateSelf();}
     @Override public int getOpacity(){return PixelFormat.TRANSLUCENT;}
 }
