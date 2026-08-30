@@ -46,9 +46,9 @@ void main() {
     float endDistance = min((uv.x-left)*aspect, (right-uv.x)*aspect) / max(capsuleH,0.0001);
     float endInfluence = clamp(1.0-endDistance/0.50, 0.0, 1.0);
     float nx = uv.x < center.x ? -1.0 : 1.0;
-    float lensProfile = 0.30+0.70*pow(abs(ny),1.35);
-    vec2 flow = vec2(nx*endInfluence*max(0.0,1.0-ny*ny)*capsuleH*0.185/aspect,
-                     ny*(1.0-0.28*endInfluence)*lensProfile*capsuleH*0.115);
+    float lensProfile = 0.34+0.66*pow(abs(ny),1.25);
+    vec2 flow = vec2(nx*endInfluence*max(0.0,1.0-ny*ny)*capsuleH*0.215/aspect,
+                     ny*(1.0-0.24*endInfluence)*lensProfile*capsuleH*0.135);
     vec2 baseUv = clamp(uv-flow, vec2(0.003), vec2(0.997));
 
     float depth = clamp(-d / max(capsuleH,0.0001), 0.0, 1.0);
@@ -62,11 +62,22 @@ void main() {
     vec3 c4 = texture2D(uTexSampler,clamp(baseUv-sy,vec2(0.003),vec2(0.997))).rgb;
     vec3 glass = (c0*3.0+c1+c2+c3+c4)/7.0;
 
+    // Reflection, RGB dispersion and diffraction all use the full capsule mask.
+    vec3 photoReflection = abs(c1-c2)+abs(c3-c4);
+    glass = 1.0-(1.0-glass)*(1.0-photoReflection*0.42);
+
     float rim = 1.0-smoothstep(0.0,0.18,depth);
-    float dispersion = (0.0014+0.0022*rim)*shortUv/aspect;
-    glass.r = mix(glass.r,texture2D(uTexSampler,clamp(baseUv+vec2(dispersion,0.0),vec2(0.003),vec2(0.997))).r,0.65);
-    glass.b = mix(glass.b,texture2D(uTexSampler,clamp(baseUv-vec2(dispersion,0.0),vec2(0.003),vec2(0.997))).b,0.65);
-    glass = mix(glass,vec3(1.0),0.02);
+    float dispersion = (0.0022+0.0025*rim)*shortUv/aspect;
+    glass.r = mix(glass.r,texture2D(uTexSampler,clamp(baseUv+vec2(dispersion,0.0),vec2(0.003),vec2(0.997))).r,0.82);
+    glass.b = mix(glass.b,texture2D(uTexSampler,clamp(baseUv-vec2(dispersion,0.0),vec2(0.003),vec2(0.997))).b,0.82);
+
+    float lx=(uv.x-center.x)/max(right-left,0.002);
+    float spectrumPos=clamp(0.5+lx+ny*0.12,0.0,1.0);
+    vec3 spectrum=mix(vec3(0.20,0.58,1.0),vec3(1.0,0.30,0.62),spectrumPos);
+    spectrum=mix(spectrum,vec3(1.0,0.72,0.22),smoothstep(0.70,1.0,spectrumPos));
+    glass=1.0-(1.0-glass)*(1.0-spectrum*0.032);
+
+    glass = mix(glass,vec3(1.0),0.03);
 
     // A thin boundary highlight, restricted to the horizontal top/bottom
     // and fading through the corners. It must never become an inner ring.
