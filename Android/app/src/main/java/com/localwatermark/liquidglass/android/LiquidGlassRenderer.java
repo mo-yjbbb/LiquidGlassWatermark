@@ -100,8 +100,8 @@ final class LiquidGlassRenderer {
                 float endInfluence = clamp01(1f-endDistance/.50f);
                 float nx = u < .5f ? -1f : 1f;
                 float edgePower = (float) Math.pow(Math.abs(ny), 1.55);
-                float dx = nx * endInfluence * Math.max(0f, 1f-ny*ny) * h * .115f;
-                float dy = ny * (1f-.28f*endInfluence) * edgePower * h * .072f;
+                float dx = nx * endInfluence * Math.max(0f, 1f-ny*ny) * h * .127f;
+                float dy = ny * (1f-.28f*endInfluence) * edgePower * h * .079f;
                 vertices[k++] = rect.left + u * rect.width() + dx;
                 vertices[k++] = rect.top + v * rect.height() + dy;
             }
