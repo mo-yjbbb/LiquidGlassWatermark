@@ -146,7 +146,7 @@ public final class MainActivity extends Activity {
         select.setElevation(dp(9));
         select.setOnClickListener(vw->pick());
 
-        TextView footer=label("所有处理均在设备本地完成",12,0x70ffffff,Typeface.NORMAL);
+        TextView footer=label("所有处理均在设备本地完成  ·  © 2026 by 呀哈哈我被发现了再见",12,0x78ffffff,Typeface.NORMAL);
         footer.setGravity(Gravity.CENTER);
         footer.setPadding(0,dp(11),0,0);
 
