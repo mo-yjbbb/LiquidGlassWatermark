@@ -8,8 +8,8 @@ android {
         applicationId "com.localwatermark.liquidglass.android"
         minSdk 29
         targetSdk 37
-        versionCode 22
-        versionName "2.8-media-original-fix"
+        versionCode 23
+        versionName "2.9-motion-orientation-fix"
     }
     buildTypes {
         release {
