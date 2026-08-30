@@ -21,21 +21,29 @@ final class LiquidGlassRenderer {
         int width = Math.min(out.getWidth() - left, Math.round(capsule.width()));
         int height = Math.min(out.getHeight() - top, Math.round(capsule.height()));
         Bitmap band = Bitmap.createBitmap(source, left, top, width, height);
+        int sampled = averageColor(band);
 
         canvas.save();
         Path clip = new Path(); clip.addRoundRect(capsule, radius, radius, Path.Direction.CW); canvas.clipPath(clip);
         drawLiquidMesh(canvas, band, capsule, h);
 
-        Paint base = new Paint(Paint.ANTI_ALIAS_FLAG); base.setColor(Color.argb(5, 255, 255, 255));
+        Paint base = new Paint(Paint.ANTI_ALIAS_FLAG); base.setColor(Color.argb(8, 255, 255, 255));
         canvas.drawRoundRect(capsule, radius, radius, base);
         Paint rainbow = new Paint(Paint.ANTI_ALIAS_FLAG);
         rainbow.setShader(new LinearGradient(capsule.left, capsule.bottom, capsule.right, capsule.top,
-                new int[]{0x0000BFFF, 0x0900BFFF, 0x0BBE66FF, 0x08FFB347, 0x00FFB347},
+                new int[]{0x0000BFFF, 0x1000BFFF, 0x18BE66FF, 0x12FFB347, 0x00FFB347},
                 new float[]{0, .22f, .52f, .80f, 1}, Shader.TileMode.CLAMP));
         rainbow.setBlendMode(BlendMode.SCREEN); canvas.drawRoundRect(capsule, radius, radius, rainbow);
+
+        Paint reflection = new Paint(Paint.ANTI_ALIAS_FLAG);
+        reflection.setShader(new LinearGradient(capsule.left, capsule.bottom, capsule.right, capsule.top,
+                new int[]{withAlpha(sampled,.02f),withAlpha(sampled,.12f),0x12ffffff,
+                        withAlpha(sampled,.08f),withAlpha(sampled,.01f)},
+                new float[]{0f,.24f,.47f,.72f,1f},Shader.TileMode.CLAMP));
+        reflection.setBlendMode(BlendMode.SCREEN);
+        canvas.drawRoundRect(capsule,radius,radius,reflection);
         canvas.restore();
 
-        int sampled = averageColor(band);
         int highlight = Color.rgb((Color.red(sampled) + 2 * 255) / 3,
                 (Color.green(sampled) + 2 * 255) / 3, (Color.blue(sampled) + 2 * 255) / 3);
         Paint edge = new Paint(Paint.ANTI_ALIAS_FLAG); edge.setStyle(Paint.Style.STROKE);
@@ -99,9 +107,9 @@ final class LiquidGlassRenderer {
                 float endDistance = Math.min(u, 1f-u) * rect.width() / h;
                 float endInfluence = clamp01(1f-endDistance/.50f);
                 float nx = u < .5f ? -1f : 1f;
-                float lensProfile = .30f + .70f * (float)Math.pow(Math.abs(ny), 1.35);
-                float dx = nx * endInfluence * Math.max(0f, 1f-ny*ny) * h * .185f;
-                float dy = ny * (1f-.28f*endInfluence) * lensProfile * h * .115f;
+                float lensProfile = .34f + .66f * (float)Math.pow(Math.abs(ny), 1.25);
+                float dx = nx * endInfluence * Math.max(0f, 1f-ny*ny) * h * .215f;
+                float dy = ny * (1f-.24f*endInfluence) * lensProfile * h * .135f;
                 vertices[k++] = rect.left + u * rect.width() + dx;
                 vertices[k++] = rect.top + v * rect.height() + dy;
             }
