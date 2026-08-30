@@ -8,8 +8,9 @@ final class MotionPhotoSupport {
         final byte[] imageBytes;
         final byte[] videoBytes;
         final boolean motion;
-        Parts(byte[] imageBytes, byte[] videoBytes, boolean motion) {
-            this.imageBytes = imageBytes; this.videoBytes = videoBytes; this.motion = motion;
+        Parts(byte[] imageBytes, byte[] bridgeBytes, byte[] videoBytes, boolean motion) {
+            this.imageBytes = imageBytes; this.bridgeBytes = bridgeBytes;
+            this.videoBytes = videoBytes; this.motion = motion;
         }
     }
 
@@ -23,13 +24,21 @@ final class MotionPhotoSupport {
         int eoi = lastJpegEoiBefore(file, start);
         if (eoi < 0) return new Parts(file, new byte[0], new byte[0], false);
         return new Parts(Arrays.copyOfRange(file, 0, eoi + 2),
+                Arrays.copyOfRange(file, eoi + 2, start),
                 Arrays.copyOfRange(file, start, file.length), true);
     }
 
-    static byte[] join(byte[] renderedJpeg, byte[] videoBytes) {
-        byte[] joined = Arrays.copyOf(renderedJpeg, renderedJpeg.length + videoBytes.length);
-        System.arraycopy(videoBytes, 0, joined, renderedJpeg.length, videoBytes.length);
+    static byte[] join(byte[] renderedJpeg, byte[] bridgeBytes, byte[] videoBytes) {
+        byte[] bridge = bridgeBytes == null ? new byte[0] : bridgeBytes;
+        byte[] joined = Arrays.copyOf(renderedJpeg,
+                renderedJpeg.length + bridge.length + videoBytes.length);
+        System.arraycopy(bridge, 0, joined, renderedJpeg.length, bridge.length);
+        System.arraycopy(videoBytes, 0, joined, renderedJpeg.length + bridge.length, videoBytes.length);
         return joined;
+    }
+
+    static byte[] join(byte[] renderedJpeg, byte[] videoBytes) {
+        return join(renderedJpeg, new byte[0], videoBytes);
     }
 
     static boolean hasVideo(byte[] file) {
