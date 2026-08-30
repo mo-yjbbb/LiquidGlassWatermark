@@ -26,7 +26,7 @@ final class LiquidGlassRenderer {
         Path clip = new Path(); clip.addRoundRect(capsule, radius, radius, Path.Direction.CW); canvas.clipPath(clip);
         drawLiquidMesh(canvas, band, capsule, h);
 
-        Paint base = new Paint(Paint.ANTI_ALIAS_FLAG); base.setColor(Color.argb(8, 255, 255, 255));
+        Paint base = new Paint(Paint.ANTI_ALIAS_FLAG); base.setColor(Color.argb(5, 255, 255, 255));
         canvas.drawRoundRect(capsule, radius, radius, base);
         Paint rainbow = new Paint(Paint.ANTI_ALIAS_FLAG);
         rainbow.setShader(new LinearGradient(capsule.left, capsule.bottom, capsule.right, capsule.top,
