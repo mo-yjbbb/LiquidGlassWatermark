@@ -47,8 +47,8 @@ void main() {
     float endInfluence = clamp(1.0-endDistance/0.50, 0.0, 1.0);
     float nx = uv.x < center.x ? -1.0 : 1.0;
     float edgePower = pow(abs(ny), 1.55);
-    vec2 flow = vec2(nx*endInfluence*max(0.0,1.0-ny*ny)*capsuleH*0.115/aspect,
-                     ny*(1.0-0.28*endInfluence)*edgePower*capsuleH*0.072);
+    vec2 flow = vec2(nx*endInfluence*max(0.0,1.0-ny*ny)*capsuleH*0.127/aspect,
+                     ny*(1.0-0.28*endInfluence)*edgePower*capsuleH*0.079);
     vec2 baseUv = clamp(uv-flow, vec2(0.003), vec2(0.997));
 
     float depth = clamp(-d / max(capsuleH,0.0001), 0.0, 1.0);
