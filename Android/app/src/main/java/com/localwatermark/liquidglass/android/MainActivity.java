@@ -29,64 +29,172 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         getWindow().setStatusBarColor(Color.TRANSPARENT);
-        getWindow().setNavigationBarColor(Color.rgb(9,10,16));
+        getWindow().setNavigationBarColor(0xff080910);
         if (Build.VERSION.SDK_INT >= 30) getWindow().setDecorFitsSystemWindows(false);
-        LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(20), dp(20), dp(20), dp(20)); root.setGravity(Gravity.CENTER_HORIZONTAL);
-        root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{0xff090a10,0xff161224,0xff241225}));
-        root.setOnApplyWindowInsetsListener((view, insets) -> {
-            android.graphics.Insets bars = Build.VERSION.SDK_INT >= 30
+
+        FrameLayout stage = new FrameLayout(this);
+        stage.setBackground(new LiquidUiDrawable(LiquidUiDrawable.BACKGROUND));
+        stage.addView(ambientOrb(0x55ff4f91, dp(300), Gravity.BOTTOM|Gravity.RIGHT, -dp(120), -dp(80)));
+        stage.addView(ambientOrb(0x443d91ff, dp(260), Gravity.TOP|Gravity.LEFT, -dp(110), dp(70)));
+        stage.addView(ambientOrb(0x2bb775ff, dp(210), Gravity.CENTER, dp(120), -dp(30)));
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER_HORIZONTAL);
+        root.setPadding(dp(20),dp(18),dp(20),dp(18));
+        root.setOnApplyWindowInsetsListener((view,insets)->{
+            android.graphics.Insets bars=Build.VERSION.SDK_INT>=30
                     ? insets.getInsets(WindowInsets.Type.systemBars())
-                    : android.graphics.Insets.of(0, insets.getSystemWindowInsetTop(), 0, insets.getSystemWindowInsetBottom());
-            view.setPadding(dp(20), bars.top + dp(18), dp(20), bars.bottom + dp(18));
+                    : android.graphics.Insets.of(0,insets.getSystemWindowInsetTop(),0,insets.getSystemWindowInsetBottom());
+            view.setPadding(dp(20),bars.top+dp(15),dp(20),bars.bottom+dp(16));
             return insets;
         });
-        LinearLayout header = new LinearLayout(this); header.setOrientation(LinearLayout.HORIZONTAL);
-        header.setGravity(Gravity.CENTER_VERTICAL); header.setPadding(dp(2),0,0,dp(18));
-        ImageView brandIcon = new ImageView(this); brandIcon.setImageResource(R.drawable.app_icon);
-        GradientDrawable iconPlate = new GradientDrawable(); iconPlate.setColor(0x18ffffff); iconPlate.setCornerRadius(dp(16));
-        iconPlate.setStroke(dp(1),0x30ffffff); brandIcon.setBackground(iconPlate); brandIcon.setPadding(dp(5),dp(5),dp(5),dp(5));
-        LinearLayout heading = new LinearLayout(this); heading.setOrientation(LinearLayout.VERTICAL); heading.setPadding(dp(13),0,0,0);
-        TextView title = new TextView(this); title.setText("液态玻璃水印"); title.setTextSize(25); title.setTextColor(Color.WHITE);
-        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD); title.setGravity(Gravity.START);
-        TextView subtitle = new TextView(this); subtitle.setText("小米 · 徕卡动态影像"); subtitle.setTextSize(13);
-        subtitle.setTextColor(0xaaffffff); subtitle.setGravity(Gravity.START); subtitle.setPadding(0,dp(3),0,0);
+
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(0,0,0,dp(18));
+
+        ImageView brandIcon = new ImageView(this);
+        brandIcon.setImageResource(R.drawable.app_icon);
+        brandIcon.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        brandIcon.setBackground(new LiquidUiDrawable(LiquidUiDrawable.CHIP));
+        brandIcon.setPadding(dp(3),dp(3),dp(3),dp(3));
+        brandIcon.setClipToOutline(true);
+        header.addView(brandIcon,new LinearLayout.LayoutParams(dp(52),dp(52)));
+
+        LinearLayout heading = new LinearLayout(this);
+        heading.setOrientation(LinearLayout.VERTICAL);
+        heading.setPadding(dp(13),0,0,0);
+        TextView title = label("液态玻璃",26,Color.WHITE,Typeface.BOLD);
+        TextView subtitle = label("影像水印工坊",13,0xa8ffffff,Typeface.NORMAL);
+        subtitle.setLetterSpacing(.08f);
+        subtitle.setPadding(0,dp(2),0,0);
         heading.addView(title); heading.addView(subtitle);
-        header.addView(brandIcon,new LinearLayout.LayoutParams(dp(54),dp(54)));
-        header.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
+        header.addView(heading,new LinearLayout.LayoutParams(0,-2,1f));
+
+        TextView localChip = label("●  本地处理",12,0xddffffff,Typeface.BOLD);
+        localChip.setGravity(Gravity.CENTER);
+        localChip.setBackground(new LiquidUiDrawable(LiquidUiDrawable.CHIP));
+        localChip.setPadding(dp(13),0,dp(13),0);
+        header.addView(localChip,new LinearLayout.LayoutParams(-2,dp(36)));
 
         FrameLayout previewCard = new FrameLayout(this);
-        GradientDrawable previewBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{0x20ffffff,0x09000000,0x16ff6d9e});
-        previewBg.setCornerRadius(dp(26)); previewBg.setStroke(dp(1),0x3cffffff);
-        previewCard.setBackground(previewBg); previewCard.setPadding(dp(7),dp(7),dp(7),dp(7));
-        preview = new ImageView(this); preview.setAdjustViewBounds(true); preview.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        previewCard.setBackground(new LiquidUiDrawable(LiquidUiDrawable.PANEL));
+        previewCard.setPadding(dp(7),dp(7),dp(7),dp(7));
+        previewCard.setElevation(dp(10));
+
+        preview = new ImageView(this);
+        preview.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        preview.setAdjustViewBounds(true);
+        preview.setBackgroundColor(0x16000000);
         previewCard.addView(preview,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout empty = new LinearLayout(this); empty.setOrientation(LinearLayout.VERTICAL); empty.setGravity(Gravity.CENTER);
-        empty.setPadding(dp(26),dp(28),dp(26),dp(28));
-        ImageView emptyIcon = new ImageView(this); emptyIcon.setImageResource(R.drawable.app_icon); emptyIcon.setAlpha(.92f);
-        TextView emptyTitle = new TextView(this); emptyTitle.setText("选择一张照片开始"); emptyTitle.setTextColor(Color.WHITE);
-        emptyTitle.setTextSize(20); emptyTitle.setTypeface(Typeface.DEFAULT,Typeface.BOLD); emptyTitle.setGravity(Gravity.CENTER);
-        emptyTitle.setPadding(0,dp(16),0,dp(7));
-        TextView emptyHint = new TextView(this); emptyHint.setText("支持小米静态照片与动态照片\n读取真实拍摄参数 · 原画质输出");
-        emptyHint.setTextColor(0x99ffffff); emptyHint.setTextSize(14); emptyHint.setGravity(Gravity.CENTER); emptyHint.setLineSpacing(dp(3),1);
-        empty.addView(emptyIcon,new LinearLayout.LayoutParams(dp(78),dp(78))); empty.addView(emptyTitle); empty.addView(emptyHint);
-        emptyState = empty; previewCard.addView(empty,new FrameLayout.LayoutParams(-1,-1));
-        progress = new ProgressBar(this); progress.setVisibility(View.GONE);
-        Button select = new Button(this); select.setText("从相册选择照片"); select.setTextColor(Color.WHITE);
-        select.setTextSize(17); select.setAllCaps(false); select.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
-        GradientDrawable glassButton = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{0x58ffffff,0x22c9a8ff,0x33ff82a9});
-        glassButton.setCornerRadius(dp(30)); glassButton.setStroke(dp(1),0x88ffffff);
-        select.setBackground(glassButton); select.setElevation(dp(8)); select.setPadding(dp(24),dp(14),dp(24),dp(14));
-        select.setOnClickListener(v -> pick());
-        root.addView(header, new LinearLayout.LayoutParams(-1, -2));
-        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1,0,1); cardParams.bottomMargin=dp(4);
-        root.addView(previewCard, cardParams);
-        root.addView(progress); LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(-1,-2);
-        buttonParams.topMargin=dp(12); root.addView(select, buttonParams); setContentView(root);
+
+        LinearLayout empty = new LinearLayout(this);
+        empty.setOrientation(LinearLayout.VERTICAL);
+        empty.setGravity(Gravity.CENTER);
+        empty.setPadding(dp(28),dp(24),dp(28),dp(24));
+
+        TextView formatChip = label("PHOTO  ·  MOTION",11,0xc9ffffff,Typeface.BOLD);
+        formatChip.setLetterSpacing(.12f);
+        formatChip.setGravity(Gravity.CENTER);
+        formatChip.setBackground(new LiquidUiDrawable(LiquidUiDrawable.CHIP));
+        formatChip.setPadding(dp(15),0,dp(15),0);
+        empty.addView(formatChip,new LinearLayout.LayoutParams(-2,dp(32)));
+
+        ImageView emptyIcon = new ImageView(this);
+        emptyIcon.setImageResource(R.drawable.app_icon);
+        emptyIcon.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        LinearLayout.LayoutParams emptyIconParams=new LinearLayout.LayoutParams(dp(82),dp(82));
+        emptyIconParams.topMargin=dp(22);
+        empty.addView(emptyIcon,emptyIconParams);
+
+        TextView emptyTitle = label("让照片拥有流动的光",21,Color.WHITE,Typeface.BOLD);
+        emptyTitle.setGravity(Gravity.CENTER);
+        emptyTitle.setPadding(0,dp(17),0,0);
+        empty.addView(emptyTitle);
+
+        TextView emptyHint = label("选择照片后，自动读取真实拍摄信息\n生成折射、色散与高光构成的液态玻璃水印",14,0x9effffff,Typeface.NORMAL);
+        emptyHint.setGravity(Gravity.CENTER);
+        emptyHint.setLineSpacing(dp(4),1f);
+        emptyHint.setPadding(dp(4),dp(9),dp(4),0);
+        empty.addView(emptyHint);
+        emptyState=empty;
+        previewCard.addView(empty,new FrameLayout.LayoutParams(-1,-1));
+
+        progress=new ProgressBar(this);
+        progress.setVisibility(View.GONE);
+        FrameLayout.LayoutParams progressParams=new FrameLayout.LayoutParams(dp(44),dp(44),Gravity.CENTER);
+        previewCard.addView(progress,progressParams);
+
+        LinearLayout capabilities=new LinearLayout(this);
+        capabilities.setOrientation(LinearLayout.HORIZONTAL);
+        capabilities.setGravity(Gravity.CENTER);
+        capabilities.setPadding(dp(2),dp(13),dp(2),dp(13));
+        capabilities.addView(feature("原画质", "不压缩参数"),new LinearLayout.LayoutParams(0,-2,1f));
+        capabilities.addView(feature("真实 EXIF", "自动读取"),new LinearLayout.LayoutParams(0,-2,1f));
+        capabilities.addView(feature("动态照片", "逐帧渲染"),new LinearLayout.LayoutParams(0,-2,1f));
+
+        TextView select=label("＋  从相册选择照片",17,Color.WHITE,Typeface.BOLD);
+        select.setGravity(Gravity.CENTER);
+        select.setClickable(true);
+        select.setFocusable(true);
+        android.graphics.drawable.RippleDrawable ripple=new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(0x35ffffff),
+                new LiquidUiDrawable(LiquidUiDrawable.BUTTON),null);
+        select.setBackground(ripple);
+        select.setElevation(dp(9));
+        select.setOnClickListener(vw->pick());
+
+        TextView footer=label("所有处理均在设备本地完成",12,0x70ffffff,Typeface.NORMAL);
+        footer.setGravity(Gravity.CENTER);
+        footer.setPadding(0,dp(11),0,0);
+
+        root.addView(header,new LinearLayout.LayoutParams(-1,-2));
+        LinearLayout.LayoutParams cardParams=new LinearLayout.LayoutParams(-1,0,1f);
+        cardParams.bottomMargin=dp(1);
+        root.addView(previewCard,cardParams);
+        root.addView(capabilities,new LinearLayout.LayoutParams(-1,-2));
+        root.addView(select,new LinearLayout.LayoutParams(-1,dp(62)));
+        root.addView(footer,new LinearLayout.LayoutParams(-1,-2));
+        stage.addView(root,new FrameLayout.LayoutParams(-1,-1));
+        setContentView(stage);
         handleIntent(getIntent());
+    }
+
+    private View ambientOrb(int color,int size,int gravity,int marginX,int marginY){
+        View orb=new View(this);
+        GradientDrawable glow=new GradientDrawable();
+        glow.setShape(GradientDrawable.OVAL);
+        glow.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+        glow.setGradientRadius(size*.5f);
+        glow.setColors(new int[]{color,color&0x00ffffff});
+        orb.setBackground(glow);
+        orb.setAlpha(.62f);
+        FrameLayout.LayoutParams p=new FrameLayout.LayoutParams(size,size,gravity);
+        if((gravity&Gravity.RIGHT)!=0)p.rightMargin=marginX; else p.leftMargin=marginX;
+        if((gravity&Gravity.BOTTOM)!=0)p.bottomMargin=marginY; else p.topMargin=marginY;
+        orb.setLayoutParams(p);
+        return orb;
+    }
+
+    private TextView label(String value,float size,int color,int style){
+        TextView view=new TextView(this);
+        view.setText(value); view.setTextSize(size); view.setTextColor(color);
+        view.setTypeface(Typeface.create("sans",style));
+        view.setIncludeFontPadding(false);
+        return view;
+    }
+
+    private View feature(String title,String detail){
+        LinearLayout box=new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL); box.setGravity(Gravity.CENTER);
+        TextView name=label(title,13,0xeaffffff,Typeface.BOLD);
+        name.setGravity(Gravity.CENTER);
+        TextView hint=label(detail,11,0x72ffffff,Typeface.NORMAL);
+        hint.setGravity(Gravity.CENTER); hint.setPadding(0,dp(3),0,0);
+        box.addView(name); box.addView(hint);
+        return box;
     }
 
     @Override protected void onNewIntent(Intent intent) { super.onNewIntent(intent); setIntent(intent); handleIntent(intent); }
