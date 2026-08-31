@@ -616,7 +616,8 @@ public final class MainActivity extends Activity {
     }
 
     private Uri resolveWritableSource(Uri uri) {
-        if (uri == null || isMediaStoreUri(uri)) return uri;
+        if (uri == null) return null;
+        if (isMediaStoreUri(uri) && !isPickerUri(uri)) return uri;
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 Uri mediaUri = MediaStore.getMediaUri(this, uri);
@@ -677,10 +678,16 @@ public final class MainActivity extends Activity {
         return uri;
     }
 
+    private static boolean isPickerUri(Uri uri) {
+        String path = uri == null ? null : uri.getPath();
+        return path != null && path.startsWith("/picker/");
+    }
+
     private static boolean isMediaStoreUri(Uri uri) {
         if (uri == null || !"content".equalsIgnoreCase(uri.getScheme())) return false;
         String authority = uri.getAuthority();
-        return authority != null && ("media".equals(authority) || authority.endsWith(".media"));
+        return authority != null && !isPickerUri(uri)
+                && ("media".equals(authority) || authority.endsWith(".media"));
     }
 
     private void verifyAndNotify(Uri uri) throws IOException {
