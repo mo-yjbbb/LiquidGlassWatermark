@@ -8,8 +8,8 @@ android {
         applicationId "com.localwatermark.liquidglass.android"
         minSdk 29
         targetSdk 37
-        versionCode 26
-        versionName "2.12-xiaomi-honor-media-fix"
+        versionCode 27
+        versionName "2.13-picker-orientation-fix"
     }
     buildTypes {
         release {
