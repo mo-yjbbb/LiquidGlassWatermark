@@ -330,7 +330,9 @@ public final class MainActivity extends Activity {
                             renderedVideo.length, Math.max(presentationTs, 0), originalXmp);
                     result = MotionPhotoSupport.join(stillWithMeta, parts.bridgeBytes, renderedVideo);
                 } else {
-                    result = ExifBuilder.buildStillJpeg(still, parts.imageBytes, exifFields);
+                    byte[] stillWithMeta = ExifBuilder.buildStillJpeg(still, parts.imageBytes, exifFields);
+                    result = parts.bridgeBytes.length == 0 ? stillWithMeta
+                            : MotionPhotoSupport.join(stillWithMeta, parts.bridgeBytes, new byte[0]);
                 }
                 if (parts.motion && !MotionPhotoSupport.hasVideo(result)) throw new IOException("动态照片视频资源校验失败");
                 finishedBytes = result; sourceWasMotion = parts.motion;
@@ -545,10 +547,6 @@ public final class MainActivity extends Activity {
                         "LGW_" + System.currentTimeMillis() + (sourceWasMotion ? "_MP.jpg" : ".jpg"));
                 values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg"); values.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/LiquidGlassWatermark");
                 values.put(MediaStore.Images.Media.IS_PENDING, 1);
-                if (sourceWasMotion && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    values.put(MediaStore.Files.FileColumns.SPECIAL_FORMAT,
-                            MediaStore.Files.FileColumns.SPECIAL_FORMAT_MOTION_PHOTO);
-                }
                 Uri output = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
                 if (output == null) throw new IOException("无法创建相册文件"); write(output, finishedBytes);
                 values.clear(); values.put(MediaStore.Images.Media.IS_PENDING, 0); getContentResolver().update(output, values, null, null);
