@@ -30,12 +30,11 @@ final class MotionVideoRenderer {
 
     static void render(Context context, File input, File output, int width, int height,
                        PhotoMetadata metadata) throws Exception {
-        // 保留原视频轨道方向，不再用封面宽高强制重建视频画布。
-        // Media3 会把轨道旋转矩阵应用到效果输入；水印只引用封面比例定位。
-        int[] video = probeVideoSize(input);
-        int outWidth = video[0] > 0 ? video[0] : width;
-        int outHeight = video[1] > 0 ? video[1] : height;
-        float targetAspect = width / (float)Math.max(1, height);
+        // 以封面实际显示方向作为唯一输出坐标系。编码器把原轨道旋转烘焙进
+        // 像素后，再由下方 normalizeTrackMatrices 清除残留旋转矩阵。
+        int outWidth = even(Math.max(2, width));
+        int outHeight = even(Math.max(2, height));
+        float targetAspect = outWidth / (float)Math.max(1, outHeight);
         Bitmap content = LiquidGlassRenderer.createContentOverlay(
                 context, outWidth, outHeight, targetAspect, metadata);
         CountDownLatch finished = new CountDownLatch(1);
@@ -44,6 +43,8 @@ final class MotionVideoRenderer {
             try {
                 BitmapOverlay bitmapOverlay = BitmapOverlay.createStaticBitmapOverlay(content);
                 List<Effect> videoEffects = new ArrayList<>();
+                videoEffects.add(Presentation.createForWidthAndHeight(
+                        outWidth, outHeight, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP));
                 videoEffects.add(new LiquidGlassVideoEffect(targetAspect));
                 videoEffects.add(new OverlayEffect(Collections.singletonList(bitmapOverlay)));
                 EditedMediaItem item = new EditedMediaItem.Builder(MediaItem.fromUri(input.toURI().toString()))
@@ -67,6 +68,60 @@ final class MotionVideoRenderer {
         content.recycle();
         if (failure.get() != null) throw new Exception("动态视频渲染失败", failure.get());
         if (!output.isFile() || output.length() < 32) throw new Exception("动态视频输出为空");
+        normalizeTrackMatrices(output);
+    }
+
+    private static int even(int value) { return value - (value & 1); }
+
+    /**
+     * Media3 在部分 MIUI/荣耀视频上会把旋转烘焙进画面后仍保留 tkhd 的
+     * 90/270 度矩阵，图库播放时就会二次旋转。输出已按封面方向编码，因此
+     * 将轨道显示矩阵归一化为单位矩阵。
+     */
+    private static void normalizeTrackMatrices(File file) throws java.io.IOException {
+        try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(file, "rw")) {
+            scanBoxes(raf, 0, raf.length());
+        }
+    }
+
+    private static void scanBoxes(java.io.RandomAccessFile raf, long start, long end)
+            throws java.io.IOException {
+        long pos = start;
+        while (pos + 8 <= end) {
+            raf.seek(pos);
+            long size = Integer.toUnsignedLong(raf.readInt());
+            int type = raf.readInt();
+            int header = 8;
+            if (size == 1) { size = raf.readLong(); header = 16; }
+            else if (size == 0) size = end - pos;
+            if (size < header || pos + size > end) return;
+            long payload = pos + header;
+            if (type == fourcc("tkhd")) {
+                raf.seek(payload);
+                int version = raf.readUnsignedByte();
+                long matrix = payload + (version == 1 ? 52 : 40);
+                if (matrix + 36 <= pos + size) {
+                    raf.seek(matrix);
+                    int[] identity = {0x00010000,0,0, 0,0x00010000,0, 0,0,0x40000000};
+                    for (int value : identity) raf.writeInt(value);
+                }
+            } else if (isContainer(type)) {
+                long child = payload + (type == fourcc("meta") ? 4 : 0);
+                scanBoxes(raf, child, pos + size);
+            }
+            pos += size;
+        }
+    }
+
+    private static boolean isContainer(int type) {
+        return type == fourcc("moov") || type == fourcc("trak") || type == fourcc("mdia")
+                || type == fourcc("minf") || type == fourcc("stbl") || type == fourcc("edts")
+                || type == fourcc("dinf") || type == fourcc("udta") || type == fourcc("meta");
+    }
+
+    private static int fourcc(String value) {
+        return (value.charAt(0) << 24) | (value.charAt(1) << 16)
+                | (value.charAt(2) << 8) | value.charAt(3);
     }
 
     /** 探测视频分辨率，用于按视频画布的比例绘制文字图层。失败返回 {0,0}。 */
