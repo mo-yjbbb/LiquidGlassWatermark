@@ -17,7 +17,16 @@ final class MotionPhotoSupport {
 
     static Parts split(byte[] file) {
         int ftyp = indexOf(file, "ftyp".getBytes(StandardCharsets.US_ASCII), 4);
-        if (ftyp < 4) return new Parts(file, new byte[0], new byte[0], false);
+        if (ftyp < 4) {
+            int honor = indexOf(file, "HiHonor_CWMV2".getBytes(StandardCharsets.US_ASCII), 0);
+            int eoi = lastJpegEoiBefore(file, file.length);
+            if (honor >= 0 && eoi >= 0 && eoi + 2 < file.length) {
+                return new Parts(Arrays.copyOfRange(file, 0, eoi + 2),
+                        Arrays.copyOfRange(file, eoi + 2, file.length),
+                        new byte[0], false);
+            }
+            return new Parts(file, new byte[0], new byte[0], false);
+        }
         int start = ftyp - 4;
         long boxSize = ((long)(file[start] & 255) << 24) | ((long)(file[start + 1] & 255) << 16)
                 | ((long)(file[start + 2] & 255) << 8) | (file[start + 3] & 255);
