@@ -30,11 +30,12 @@ final class MotionVideoRenderer {
 
     static void render(Context context, File input, File output, int width, int height,
                        PhotoMetadata metadata) throws Exception {
-        // 以封面实际显示方向作为唯一输出坐标系。编码器把原轨道旋转烘焙进
-        // 像素后，再由下方 normalizeTrackMatrices 清除残留旋转矩阵。
-        int outWidth = even(Math.max(2, width));
-        int outHeight = even(Math.max(2, height));
-        float targetAspect = outWidth / (float)Math.max(1, outHeight);
+        // 使用内嵌视频自己的编码尺寸；封面尺寸只能用于定位比例，不能拿来
+        // 重建视频画布，否则 1080x1440 的竖版视频会被编码成 4096x3072。
+        int[] sourceVideo = probeVideoSize(input);
+        int outWidth = even(sourceVideo[0] > 0 ? sourceVideo[0] : width);
+        int outHeight = even(sourceVideo[1] > 0 ? sourceVideo[1] : height);
+        float targetAspect = width / (float)Math.max(1, height);
         Bitmap content = LiquidGlassRenderer.createContentOverlay(
                 context, outWidth, outHeight, targetAspect, metadata);
         CountDownLatch finished = new CountDownLatch(1);
@@ -43,8 +44,7 @@ final class MotionVideoRenderer {
             try {
                 BitmapOverlay bitmapOverlay = BitmapOverlay.createStaticBitmapOverlay(content);
                 List<Effect> videoEffects = new ArrayList<>();
-                videoEffects.add(Presentation.createForWidthAndHeight(
-                        outWidth, outHeight, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP));
+                videoEffects.add(Presentation.createForHeight(outHeight));
                 videoEffects.add(new LiquidGlassVideoEffect(targetAspect));
                 videoEffects.add(new OverlayEffect(Collections.singletonList(bitmapOverlay)));
                 EditedMediaItem item = new EditedMediaItem.Builder(MediaItem.fromUri(input.toURI().toString()))
