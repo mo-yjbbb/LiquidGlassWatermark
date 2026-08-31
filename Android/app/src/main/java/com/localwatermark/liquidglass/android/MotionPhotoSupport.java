@@ -6,6 +6,7 @@ import java.util.Arrays;
 final class MotionPhotoSupport {
     static final class Parts {
         final byte[] imageBytes;
+        final byte[] bridgeBytes;
         final byte[] videoBytes;
         final boolean motion;
         Parts(byte[] imageBytes, byte[] bridgeBytes, byte[] videoBytes, boolean motion) {
