@@ -618,24 +618,64 @@ public final class MainActivity extends Activity {
     }
 
     private Uri resolveWritableSource(Uri uri) {
-        if (uri == null) return null;
+        if (uri == null || isMediaStoreUri(uri)) return uri;
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 Uri mediaUri = MediaStore.getMediaUri(this, uri);
                 if (mediaUri != null) return mediaUri;
             }
+        } catch (Throwable ignored) { }
+        try {
             if ("com.android.providers.media.documents".equals(uri.getAuthority())) {
                 String documentId = android.provider.DocumentsContract.getDocumentId(uri);
                 String[] parts = documentId.split(":");
                 if (parts.length == 2 && "image".equalsIgnoreCase(parts[0])) {
                     long id = Long.parseLong(parts[1]);
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        return MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL, id);
-                    }
-                    return ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id);
+                    return ContentUris.withAppendedId(
+                            MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id);
                 }
             }
         } catch (Throwable ignored) { }
+
+        // MIUI/澎湃相册可能返回自己的 provider URI。读取它公开的文件信息，
+        // 再反查标准 MediaStore _ID，系统修改授权只接受后者。
+        String path = null, name = null;
+        long size = -1, modified = -1;
+        try (android.database.Cursor cursor = getContentResolver().query(uri, null, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                int index = cursor.getColumnIndex(MediaStore.MediaColumns.DATA);
+                if (index >= 0 && !cursor.isNull(index)) path = cursor.getString(index);
+                index = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME);
+                if (index >= 0 && !cursor.isNull(index)) name = cursor.getString(index);
+                index = cursor.getColumnIndex(MediaStore.MediaColumns.SIZE);
+                if (index >= 0 && !cursor.isNull(index)) size = cursor.getLong(index);
+                index = cursor.getColumnIndex(MediaStore.MediaColumns.DATE_MODIFIED);
+                if (index >= 0 && !cursor.isNull(index)) modified = cursor.getLong(index);
+            }
+        } catch (Throwable ignored) { }
+
+        Uri collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+        String selection = null; String[] args = null;
+        if (path != null && !path.isEmpty()) {
+            selection = MediaStore.MediaColumns.DATA + "=?";
+            args = new String[]{path};
+        } else if (name != null && !name.isEmpty() && size >= 0) {
+            selection = MediaStore.MediaColumns.DISPLAY_NAME + "=? AND "
+                    + MediaStore.MediaColumns.SIZE + "=?";
+            args = new String[]{name, Long.toString(size)};
+        } else if (name != null && !name.isEmpty()) {
+            selection = MediaStore.MediaColumns.DISPLAY_NAME + "=?";
+            args = new String[]{name};
+        }
+        if (selection != null) {
+            try (android.database.Cursor cursor = getContentResolver().query(collection,
+                    new String[]{MediaStore.Images.Media._ID}, selection, args,
+                    MediaStore.MediaColumns.DATE_MODIFIED + " DESC")) {
+                if (cursor != null && cursor.moveToFirst()) {
+                    return ContentUris.withAppendedId(collection, cursor.getLong(0));
+                }
+            } catch (Throwable ignored) { }
+        }
         return uri;
     }
 
