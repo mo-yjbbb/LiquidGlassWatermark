@@ -10,7 +10,6 @@ import androidx.media3.common.MimeTypes;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.effect.BitmapOverlay;
 import androidx.media3.effect.OverlayEffect;
-import androidx.media3.effect.Presentation;
 import androidx.media3.transformer.EditedMediaItem;
 import androidx.media3.transformer.Effects;
 import androidx.media3.transformer.ExportException;
@@ -44,7 +43,6 @@ final class MotionVideoRenderer {
             try {
                 BitmapOverlay bitmapOverlay = BitmapOverlay.createStaticBitmapOverlay(content);
                 List<Effect> videoEffects = new ArrayList<>();
-                videoEffects.add(Presentation.createForHeight(outHeight));
                 videoEffects.add(new LiquidGlassVideoEffect(targetAspect));
                 videoEffects.add(new OverlayEffect(Collections.singletonList(bitmapOverlay)));
                 EditedMediaItem item = new EditedMediaItem.Builder(MediaItem.fromUri(input.toURI().toString()))
