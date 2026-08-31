@@ -8,8 +8,8 @@ android {
         applicationId "com.localwatermark.liquidglass.android"
         minSdk 29
         targetSdk 37
-        versionCode 27
-        versionName "2.13-picker-orientation-fix"
+        versionCode 28
+        versionName "2.14-native-video-size"
     }
     buildTypes {
         release {
