@@ -68,10 +68,38 @@ final class MotionVideoRenderer {
         content.recycle();
         if (failure.get() != null) throw new Exception("动态视频渲染失败", failure.get());
         if (!output.isFile() || output.length() < 32) throw new Exception("动态视频输出为空");
-        normalizeTrackMatrices(output);
+        verifyDisplayOrientation(output, width, height);
     }
 
     private static int even(int value) { return value - (value & 1); }
+
+    private static void verifyDisplayOrientation(File output, int coverWidth, int coverHeight)
+            throws Exception {
+        int[] info = probeVideoDisplay(output);
+        if (info[0] <= 0 || info[1] <= 0) return;
+        boolean coverPortrait = coverHeight > coverWidth;
+        boolean videoPortrait = info[1] > info[0];
+        if (coverPortrait != videoPortrait) {
+            throw new Exception("动态视频方向校验失败：封面 "
+                    + coverWidth + "x" + coverHeight + "，视频显示 " + info[0] + "x" + info[1]);
+        }
+    }
+
+    private static int[] probeVideoDisplay(File file) {
+        android.media.MediaMetadataRetriever r = new android.media.MediaMetadataRetriever();
+        try {
+            r.setDataSource(file.getAbsolutePath());
+            int w = parseInt(r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH));
+            int h = parseInt(r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT));
+            int rotation = parseInt(r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION));
+            if ((Math.abs(rotation) % 180) == 90) { int swap = w; w = h; h = swap; }
+            return new int[]{w,h};
+        } catch (Throwable ignored) {
+            return new int[]{0,0};
+        } finally {
+            try { r.release(); } catch (Throwable ignored) { }
+        }
+    }
 
     /**
      * Media3 在部分 MIUI/荣耀视频上会把旋转烘焙进画面后仍保留 tkhd 的
